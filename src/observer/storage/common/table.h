@@ -44,7 +44,7 @@ public:
    * @param attributes 字段
    */
   RC create(const char *path, const char *name, const char *base_dir, int attribute_count, const AttrInfo attributes[]);
-
+  RC destroy(const char *path);
   /**
    * 打开一个表
    * @param meta_file 保存表元数据的文件完整路径

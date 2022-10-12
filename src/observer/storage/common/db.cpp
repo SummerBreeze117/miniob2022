@@ -76,6 +76,29 @@ RC Db::create_table(const char *table_name, int attribute_count, const AttrInfo 
   return RC::SUCCESS;
 }
 
+RC Db::drop_table(const char *table_name)
+{
+  RC rc = RC::SUCCESS;
+  // fix me : check table_name
+  Table *table = find_table(table_name);
+  if (table == nullptr) {
+    LOG_WARN("%s does not exist.", table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  // 文件路径可以移到Table模块
+  rc = table->destroy(path_.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to drop table %s.", table_name);
+    return rc;
+  }
+
+  opened_tables_.erase(table_name);
+  delete table;
+  LOG_INFO("Drop table success. table name=%s", table_name);
+  return rc;
+}
+
 Table *Db::find_table(const char *table_name) const
 {
   std::unordered_map<std::string, Table *>::const_iterator iter = opened_tables_.find(table_name);

@@ -118,6 +118,37 @@ RC Table::create(
   return rc;
 }
 
+RC Table::destroy(const char *path)
+{
+  RC rc = sync(); // 刷新脏页
+  if (rc != RC::SUCCESS) return rc;
+
+  std::string meta_path = table_meta_file(path, name());
+  if (::unlink(meta_path.c_str()) != 0) {
+    LOG_ERROR("Failed to remove meta file=%s, errno=%d", meta_path.c_str(), errno);
+    return RC::GENERIC_ERROR;
+  }
+
+  std::string data_path = table_data_file(path, name());
+  if (::unlink(data_path.c_str()) != 0) {
+    LOG_ERROR("Failed to remove data file=%s, errno=%d", meta_path.c_str(), errno);
+    return RC::GENERIC_ERROR;
+  }
+
+  const int index_num = table_meta_.index_num();
+  for (int i = 0; i < index_num; i ++) {
+    dynamic_cast<BplusTreeIndex*>(indexes_[i])->close();
+    const IndexMeta *index_meta = table_meta_.index(i);
+    std::string index_path = table_index_file(path, name(), index_meta->name());
+    if (::unlink(index_path.c_str()) != 0) {
+      LOG_ERROR("Failed to remove index file=%s, errno=%d", meta_path.c_str(), errno);
+      return RC::GENERIC_ERROR;
+    }
+  }
+
+  return RC::SUCCESS;
+}
+
 RC Table::open(const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
