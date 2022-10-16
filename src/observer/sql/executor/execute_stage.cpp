@@ -31,6 +31,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/index_scan_operator.h"
 #include "sql/operator/predicate_operator.h"
 #include "sql/operator/delete_operator.h"
+#include "sql/operator/update_operator.h"
 #include "sql/operator/project_operator.h"
 #include "sql/stmt/stmt.h"
 #include "sql/stmt/select_stmt.h"
@@ -142,7 +143,7 @@ void ExecuteStage::handle_request(common::StageEvent *event)
       do_insert(sql_event);
     } break;
     case StmtType::UPDATE: {
-      //do_update((UpdateStmt *)stmt, session_event);
+      do_update(sql_event);
     } break;
     case StmtType::DELETE: {
       do_delete(sql_event);
@@ -391,12 +392,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     rc = RC::UNIMPLENMENT;
     return rc;
   }
-
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
   }
-
   DEFER([&] () {delete scan_oper;});
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());
@@ -435,6 +434,31 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     rc = project_oper.close();
   }
   session_event->set_response(ss.str());
+  return rc;
+}
+
+RC ExecuteStage::do_update(SQLStageEvent *sql_event)
+{
+  RC rc = RC::SUCCESS;
+  UpdateStmt *updateStmt = dynamic_cast<UpdateStmt*>(sql_event->stmt());
+  SessionEvent *session_event = sql_event->session_event();
+  Operator *scan_oper = try_to_create_index_scan_operator(updateStmt->filter_stmt());
+  if (nullptr == scan_oper) {
+    scan_oper = new TableScanOperator(updateStmt->table());
+  }
+  DEFER([&] () {delete scan_oper;});
+
+  PredicateOperator pred_oper(updateStmt->filter_stmt());
+  pred_oper.add_child(scan_oper);
+  UpdateOperator update_oper(updateStmt);
+  update_oper.add_child(&pred_oper);
+  rc = update_oper.open();
+
+  if (rc != RC::SUCCESS) {
+    session_event->set_response("FAILURE\n");
+  } else {
+    session_event->set_response("SUCCESS\n");
+  }
   return rc;
 }
 
