@@ -70,8 +70,6 @@ void value_init_date(Value *value, const char *v) {
   };
   if (!check_date(year, month, day)) {
     value->type = CHARS;
-    value->data = nullptr;
-    return;
   }
   int data = year * 10000 + month * 100 + day;
   value->data = malloc(sizeof data);
