@@ -69,6 +69,7 @@ void value_init_date(Value *value, const char *v) {
            && d > 0 &&(d <= mon[m] + ((m == 2 && leap) ? 1 : 0));
   };
   if (!check_date(year, month, day)) {
+    value->type = CHARS;
     value->data = nullptr;
     return;
   }
