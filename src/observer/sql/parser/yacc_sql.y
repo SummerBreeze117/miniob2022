@@ -17,6 +17,8 @@ typedef struct ParserContext {
   size_t from_length;
   size_t value_length;
   Value values[MAX_NUM];
+  size_t tuple_length;
+  InsertTuple tuples[MAX_NUM];
   Condition conditions[MAX_NUM];
   CompOp comp;
 	char id[MAX_NUM];
@@ -43,7 +45,8 @@ void yyerror(yyscan_t scanner, const char *str)
   context->from_length = 0;
   context->select_length = 0;
   context->value_length = 0;
-  context->ssql->sstr.insertion.value_num = 0;
+  context->tuple_length = 0;
+  context->ssql->sstr.insertion.tuple_num = 0;
   printf("parse sql failed. error=%s", str);
 }
 
@@ -282,7 +285,7 @@ ID_get:
 
 	
 insert:				/*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE SEMICOLON 
+    INSERT INTO ID VALUES tuple tuple_list SEMICOLON
 		{
 			// CONTEXT->values[CONTEXT->value_length++] = *$6;
 
@@ -292,11 +295,27 @@ insert:				/*insert   语句的语法解析树*/
 			// for(i = 0; i < CONTEXT->value_length; i++){
 			// 	CONTEXT->ssql->sstr.insertion.values[i] = CONTEXT->values[i];
       // }
-			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->values, CONTEXT->value_length);
+			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->tuples, CONTEXT->tuple_length);
 
       //临时变量清零
       CONTEXT->value_length=0;
+      CONTEXT->tuple_length=0;
+      memset(CONTEXT->tuples, 0, sizeof(CONTEXT->tuples));
     }
+
+tuple_list:
+    /* empty */
+    | COMMA tuple tuple_list {
+    };
+
+tuple:
+    /* empty */
+    | LBRACE value value_list RBRACE {
+    	memcpy(CONTEXT->tuples[CONTEXT->tuple_length].values, CONTEXT->values, sizeof(Value)*CONTEXT->value_length);
+    	CONTEXT->tuples[CONTEXT->tuple_length].value_num = CONTEXT->value_length;
+    	CONTEXT->value_length = 0;
+        CONTEXT->tuple_length++;
+    };
 
 value_list:
     /* empty */

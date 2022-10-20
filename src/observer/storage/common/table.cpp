@@ -330,15 +330,11 @@ RC Table::recover_insert_record(Record *record)
   return rc;
 }
 
-RC Table::insert_record(Trx *trx, int value_num, const Value *values)
+RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
 {
-  if (value_num <= 0 || nullptr == values) {
-    LOG_ERROR("Invalid argument. table name: %s, value num=%d, values=%p", name(), value_num, values);
-    return RC::INVALID_ARGUMENT;
-  }
-
+  RC rc = RC::SUCCESS;
   char *record_data;
-  RC rc = make_record(value_num, values, record_data);
+  rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
     return rc;
@@ -348,7 +344,24 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values)
   record.set_data(record_data);
   rc = insert_record(trx, &record);
   delete[] record_data;
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to insert a record. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
   return rc;
+}
+
+RC Table::insert_record(Trx *trx, int tuple_num, const InsertTuple *tuples)
+{
+  for (int i = 0; i < tuple_num; i ++) {
+    int value_num = tuples[i].value_num;
+    const Value *values = tuples[i].values;
+    RC rc = insert_one_record(trx, value_num, values);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
+  return RC::SUCCESS;
 }
 
 const char *Table::name() const
