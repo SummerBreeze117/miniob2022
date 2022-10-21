@@ -327,7 +327,7 @@ void TableMeta::desc_index(std::ostream &os) const
     os << name() << " | ";
     os << non_unique << " | ";
     os << indexes_[i].name() << " | ";
-    os << i + 1 << " | ";
+    os << 1 << " | ";
     os << indexes_[i].field() << "\n";
   }
 }
