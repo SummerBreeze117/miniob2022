@@ -167,6 +167,9 @@ void ExecuteStage::handle_request(common::StageEvent *event)
     case SCF_SHOW_TABLES: {
       do_show_tables(sql_event);
     } break;
+    case SCF_SHOW_INDEX: {
+      do_show_index(sql_event);
+    } break;
     case SCF_DESC_TABLE: {
       do_desc_table(sql_event);
     } break;
@@ -549,6 +552,22 @@ RC ExecuteStage::do_show_tables(SQLStageEvent *sql_event)
     }
     session_event->set_response(ss.str().c_str());
   }
+  return RC::SUCCESS;
+}
+
+RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
+{
+  Query *query = sql_event->query();
+  Db *db = sql_event->session_event()->session()->get_current_db();
+  const char *table_name = query->sstr.show_index.relation_name;
+  Table *table = db->find_table(table_name);
+  std::stringstream ss;
+  if (table != nullptr) {
+    table->table_meta().desc_index(ss);
+  } else {
+    ss << "No such table: " << table_name << std::endl;
+  }
+  sql_event->session_event()->set_response(ss.str().c_str());
   return RC::SUCCESS;
 }
 

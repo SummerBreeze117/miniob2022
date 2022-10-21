@@ -59,6 +59,7 @@ public:
   int get_serial_size() const override;
   void to_string(std::string &output) const override;
   void desc(std::ostream &os) const;
+  void desc_index(std::ostream &os) const;
 
 protected:
   static RC init_sys_fields();

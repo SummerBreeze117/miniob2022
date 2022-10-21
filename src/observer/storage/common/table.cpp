@@ -333,6 +333,11 @@ RC Table::recover_insert_record(Record *record)
 RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
 {
   RC rc = RC::SUCCESS;
+  if (value_num <= 0 || nullptr == values) {
+    LOG_ERROR("Invalid argument. table name: %s, value num=%d, values=%p", name(), value_num, values);
+    return RC::INVALID_ARGUMENT;
+  }
+
   char *record_data;
   rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
@@ -376,26 +381,7 @@ const TableMeta &Table::table_meta() const
 
 RC Table::make_record(int value_num, const Value *values, char *&record_out)
 {
-  // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
-    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
-    return RC::SCHEMA_FIELD_MISSING;
-  }
-
   const int normal_field_start_index = table_meta_.sys_field_num();
-  for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &value = values[i];
-    if (field->type() != value.type) {
-      LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
-          table_meta_.name(),
-          field->name(),
-          field->type(),
-          value.type);
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-  }
-
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char *record = new char[record_size];

@@ -17,11 +17,11 @@ See the Mulan PSL v2 for more details. */
 
 #include <stddef.h>
 
-#define MAX_NUM 20
-#define MAX_REL_NAME 20
-#define MAX_ATTR_NAME 20
-#define MAX_ERROR_MESSAGE 20
-#define MAX_DATA 50
+#define MAX_NUM 16
+#define MAX_REL_NAME 32
+#define MAX_ATTR_NAME 32
+#define MAX_ERROR_MESSAGE 32
+#define MAX_DATA 64
 
 //属性结构体
 typedef struct {
@@ -138,6 +138,10 @@ typedef struct {
 
 typedef struct {
   const char *relation_name;
+} ShowIndex;
+
+typedef struct {
+  const char *relation_name;
 } DescTable;
 
 typedef struct {
@@ -154,6 +158,7 @@ union Queries {
   DropTable drop_table;
   CreateIndex create_index;
   DropIndex drop_index;
+  ShowIndex show_index;
   DescTable desc_table;
   LoadData load_data;
   char *errors;
@@ -170,6 +175,7 @@ enum SqlCommandFlag {
   SCF_DROP_TABLE,
   SCF_CREATE_INDEX,
   SCF_DROP_INDEX,
+  SCF_SHOW_INDEX,
   SCF_SYNC,
   SCF_SHOW_TABLES,
   SCF_DESC_TABLE,
@@ -237,6 +243,9 @@ void create_index_destroy(CreateIndex *create_index);
 
 void drop_index_init(DropIndex *drop_index, const char *index_name);
 void drop_index_destroy(DropIndex *drop_index);
+
+void show_index_init(ShowIndex *show_index, const char *relation_name);
+void show_index_destroy(ShowIndex *show_index);
 
 void desc_table_init(DescTable *desc_table, const char *relation_name);
 void desc_table_destroy(DescTable *desc_table);

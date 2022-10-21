@@ -318,3 +318,16 @@ void TableMeta::desc(std::ostream &os) const
   }
   os << ')' << std::endl;
 }
+
+void TableMeta::desc_index(std::ostream &os) const
+{
+  os << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
+  int non_unique = index_num() == 1 ? 1 : 0;
+  for (int i = 0; i < index_num(); i ++) {
+    os << name() << " | ";
+    os << non_unique << " | ";
+    os << indexes_[i].name() << " | ";
+    os << i + 1 << " | ";
+    os << indexes_[i].field() << "\n";
+  }
+}
