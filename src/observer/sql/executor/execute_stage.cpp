@@ -565,7 +565,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
   if (table != nullptr) {
     table->table_meta().desc_index(ss);
   } else {
-    sql_event->session_event()->set_response("SUCCESS\n");
+    sql_event->session_event()->set_response("FAILURE\n");
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
   sql_event->session_event()->set_response(ss.str().c_str());

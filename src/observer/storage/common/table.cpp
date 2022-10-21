@@ -333,22 +333,23 @@ void Table::cast_type(AttrType type, Value value, size_t len)
       memcpy(value.data, cast_str.c_str(), len);
     } break;
     case INTS: {
-      int cast_v;
+      float cast_float = 0.0;
       if (value.type == CHARS) {
-        cast_v = atoi((const char *)(value.data));
+        cast_float = atof((const char *)(value.data));
       } else if (value.type == FLOATS) {
-        cast_v = (int)std::round(*(float *)value.data);
+        cast_float = *(float *)value.data;
       }
-      memcpy(value.data, &cast_v, len);
+      int cast_int = std::round(cast_float);
+      memcpy(value.data, &cast_int, len);
     } break;
     case FLOATS: {
-      float cast_v;
+      float cast_float;
       if (value.type == CHARS) {
-        cast_v = atof((const char *)(value.data));
+        cast_float = atof((const char *)(value.data));
       } else if (value.type == INTS) {
-        cast_v = *(float *)value.data;
+        cast_float = *(float *)value.data;
       }
-      memcpy(value.data, &cast_v, len);
+      memcpy(value.data, &cast_float, len);
     } break;
     default:
       break;
