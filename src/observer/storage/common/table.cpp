@@ -327,6 +327,8 @@ void Table::cast_type(AttrType type, Value value, size_t len)
         cast_str = std::to_string(*(int *)value.data);
       } else if (value.type == FLOATS) {
         cast_str = std::to_string(*(float *)value.data);
+        while (cast_str.back() == '0') cast_str.pop_back();
+        if (cast_str.back() == '.') cast_str.push_back('0');
       }
       memcpy(value.data, cast_str.c_str(), len);
     } break;
