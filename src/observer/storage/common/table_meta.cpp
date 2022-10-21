@@ -325,7 +325,7 @@ void TableMeta::desc_index(std::ostream &os) const
   int non_unique = index_num() != 1 ? 1 : 0;
   for (int i = 0; i < index_num(); i ++) {
     os << name() << " | ";
-    os << non_unique << " | ";
+    os << 1 << " | ";
     os << indexes_[i].name() << " | ";
     os << 1 << " | ";
     os << indexes_[i].field() << "\n";
