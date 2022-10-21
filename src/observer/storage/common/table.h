@@ -100,6 +100,7 @@ private:
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
 
   RC insert_record(Trx *trx, Record *record);
+  void cast_type(AttrType type, Value value, size_t len);
 
 public:
   RC recover_insert_record(Record *record);

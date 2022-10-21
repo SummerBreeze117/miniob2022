@@ -566,6 +566,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
     table->table_meta().desc_index(ss);
   } else {
     ss << "No such table: " << table_name << std::endl;
+    return RC::SCHEMA_TABLE_NOT_EXIST;
   }
   sql_event->session_event()->set_response(ss.str().c_str());
   return RC::SUCCESS;

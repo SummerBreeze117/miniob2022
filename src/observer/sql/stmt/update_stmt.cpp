@@ -48,7 +48,7 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
 
   // check field type & value type
   Value value = update_sql.value;
-  if (value.type != field_meta->type()) {
+  if ((field_meta->type() == DATES || value.type == DATES) && value.type != field_meta->type()) {
     LOG_WARN("field type does not match. field name=%s", field_name);
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }

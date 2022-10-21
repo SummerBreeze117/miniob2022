@@ -81,7 +81,7 @@ public:
   ValueExpr() = default;
   ValueExpr(const Value &value) : tuple_cell_(value.type, (char *)value.data)
   {
-    if (value.type == CHARS) {
+    if (value.type == CHARS || value.type == TEXTS) {
       tuple_cell_.set_length(strlen((const char *)value.data));
     }
   }

@@ -28,6 +28,7 @@ void TupleCell::to_string(std::ostream &os) const
     float v = *(float *)data_;
     os << double2string(v);
   } break;
+  case TEXTS:
   case CHARS: {
     for (int i = 0; i < length_; i++) {
       if (data_[i] == '\0') {
@@ -54,7 +55,7 @@ int TupleCell::compare(const TupleCell &other) const
     switch (this->attr_type_) {
     case DATES: case INTS: return compare_int(this->data_, other.data_);
     case FLOATS: return compare_float(this->data_, other.data_);
-    case CHARS: return compare_string(this->data_, this->length_, other.data_, other.length_);
+    case TEXTS: case CHARS: return compare_string(this->data_, this->length_, other.data_, other.length_);
     default: {
       LOG_WARN("unsupported type: %d", this->attr_type_);
     }
@@ -65,6 +66,18 @@ int TupleCell::compare(const TupleCell &other) const
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == INTS) {
     float other_data = *(int *)other.data_;
     return compare_float(data_, &other_data);
+  } else if (this->attr_type_ == INTS && other.attr_type_ == CHARS) {
+    int cast_v = atoi(other.data());
+    return compare_int(this->data_, &cast_v);
+  } else if (this->attr_type_ == CHARS && other.attr_type_ == INTS) {
+    int cast_v = atoi(this->data_);
+    return compare_int(&cast_v, other.data_);
+  } else if (this->attr_type_ == FLOATS && other.attr_type_ == CHARS) {
+    float cast_v = atof(other.data());
+    return compare_float(this->data_, &cast_v);
+  } else if (this->attr_type_ == CHARS && other.attr_type_ == FLOATS) {
+    float cast_v = atof(this->data_);
+    return compare_float(&cast_v, other.data_);
   }
   LOG_WARN("not supported");
   return -1; // TODO return rc?

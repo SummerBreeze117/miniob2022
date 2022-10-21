@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include <limits.h>
 #include <string.h>
 #include <algorithm>
+#include <cmath>
 
 #include "common/defs.h"
 #include "storage/common/table.h"
@@ -317,6 +318,41 @@ RC Table::insert_record(Trx *trx, Record *record)
   return rc;
 }
 
+void Table::cast_type(AttrType type, Value value, size_t len)
+{
+  switch (type) {
+    case CHARS: {
+      std::string cast_str;
+      if (value.type == INTS) {
+        cast_str = std::to_string(*(int *)value.data);
+      } else if (value.type == FLOATS) {
+        cast_str = std::to_string(*(float *)value.data);
+      }
+      memcpy(value.data, cast_str.c_str(), len);
+    } break;
+    case INTS: {
+      int cast_v;
+      if (value.type == CHARS) {
+        cast_v = atoi((const char *)(value.data));
+      } else if (value.type == FLOATS) {
+        cast_v = (int)std::round(*(float *)value.data);
+      }
+      memcpy(value.data, &cast_v, len);
+    } break;
+    case FLOATS: {
+      float cast_v;
+      if (value.type == CHARS) {
+        cast_v = atof((const char *)(value.data));
+      } else if (value.type == INTS) {
+        cast_v = *(float *)value.data;
+      }
+      memcpy(value.data, &cast_v, len);
+    } break;
+    default:
+      break;
+  }
+}
+
 RC Table::recover_insert_record(Record *record)
 {
   RC rc = RC::SUCCESS;
@@ -390,6 +426,9 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
     size_t copy_len = field->len();
+    if (field->type() != value.type) { // 基本类型转换
+      cast_type(field->type(), value, copy_len);
+    }
     if (field->type() == CHARS) {
       const size_t data_len = strlen((const char *)value.data);
       if (copy_len > data_len) {
@@ -681,6 +720,9 @@ RC Table::update_record(Trx *trx, Record *record, const FieldMeta *field, const 
 
   } else {
     size_t copy_len = field->len();
+    if (field->type() != value.type) {
+      cast_type(field->type(), value, copy_len);
+    }
     if (field->type() == CHARS) {
       const size_t data_len = strlen((const char *)value.data);
       if (copy_len > data_len) {
@@ -964,6 +1006,12 @@ IndexScanner *Table::find_index_for_scan(const ConditionFilter *filter)
 RC Table::sync()
 {
   RC rc = RC::SUCCESS;
+
+  rc = data_buffer_pool_->flush_all_pages();
+  if (rc != RC::SUCCESS) {
+    return RC::IOERR_WRITE;
+  }
+
   for (Index *index : indexes_) {
     rc = index->sync();
     if (rc != RC::SUCCESS) {

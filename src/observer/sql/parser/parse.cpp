@@ -56,6 +56,9 @@ void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
   value->data = strdup(v);
+//  int len = strlen(v);
+//  if (len <= 4) value->type = CHARS;
+//  else value->type = TEXTS;
 }
 void value_init_date(Value *value, const char *v) {
   value->type = DATES;
