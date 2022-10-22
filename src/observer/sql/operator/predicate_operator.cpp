@@ -75,7 +75,7 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     right_expr->get_value(tuple, right_cell);
 
     if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
-      return true;
+      return false; // bad case
     }
 
     const int compare = left_cell.compare(right_cell);
