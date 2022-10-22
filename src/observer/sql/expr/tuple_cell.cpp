@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by WangYunlai on 2022/07/05.
 //
 
+#include <cmath>
 #include "sql/expr/tuple_cell.h"
 #include "storage/common/field.h"
 #include "common/log/log.h"
@@ -67,11 +68,13 @@ int TupleCell::compare(const TupleCell &other) const
     float other_data = *(int *)other.data_;
     return compare_float(data_, &other_data);
   } else if (this->attr_type_ == INTS && other.attr_type_ == CHARS) {
-    int cast_v = atoi(other.data());
-    return compare_int(this->data_, &cast_v);
+    float cast_float = atof(other.data());
+    int cast_int = std::round(cast_float);
+    return compare_int(this->data_, &cast_int);
   } else if (this->attr_type_ == CHARS && other.attr_type_ == INTS) {
-    int cast_v = atoi(this->data_);
-    return compare_int(&cast_v, other.data_);
+    float cast_float = atof(this->data_);
+    int cast_int = std::round(cast_float);
+    return compare_int(&cast_int, other.data_);
   } else if (this->attr_type_ == FLOATS && other.attr_type_ == CHARS) {
     float cast_v = atof(other.data());
     return compare_float(this->data_, &cast_v);
