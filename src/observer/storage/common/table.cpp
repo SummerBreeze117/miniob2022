@@ -1010,7 +1010,7 @@ RC Table::sync()
 {
   RC rc = RC::SUCCESS;
 
-  rc = data_buffer_pool_->flush_all_pages();
+  //rc = data_buffer_pool_->flush_all_pages();
   if (rc != RC::SUCCESS) {
     return RC::IOERR_WRITE;
   }
