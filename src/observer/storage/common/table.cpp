@@ -347,7 +347,7 @@ void Table::cast_type(AttrType type, Value value, size_t len)
       if (value.type == CHARS) {
         cast_float = atof((const char *)(value.data));
       } else if (value.type == INTS) {
-        cast_float = *(float *)value.data;
+        cast_float = *(int *)value.data;
       }
       memcpy(value.data, &cast_float, len);
     } break;
