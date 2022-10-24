@@ -77,6 +77,13 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
       return false; // bad case
     }
+    //case like/not like
+    if (comp == STRING_LIKE) {
+      return left_cell.string_like(right_cell);
+    }
+    if (comp == STRING_NOT_LIKE) {
+      return !left_cell.string_like(right_cell);
+    }
 
     const int compare = left_cell.compare(right_cell);
     bool filter_result = false;

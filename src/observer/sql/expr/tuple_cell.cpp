@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <cmath>
+#include <regex>
 #include "sql/expr/tuple_cell.h"
 #include "storage/common/field.h"
 #include "common/log/log.h"
@@ -84,4 +85,16 @@ int TupleCell::compare(const TupleCell &other) const
   }
   LOG_WARN("not supported");
   return -1; // TODO return rc?
+}
+
+bool TupleCell::string_like(const TupleCell &other) const
+{
+    std::string data(this->data_), other_data(other.data_);
+    std::string pattern;
+    for (auto c : other_data) {
+      if (c == '%') pattern += "[^\']*";
+      else if (c == '_') pattern += "[^\']";
+      else if (c != '\'') pattern += c;
+    }
+    return std::regex_match(data, std::regex(pattern));
 }

@@ -107,6 +107,8 @@ ParserContext *get_context(yyscan_t scanner)
         LE
         GE
         NE
+        LIKE
+        NOT //NOT LIKE
 
 %union {
   struct _Attr *attr;
@@ -447,7 +449,7 @@ condition_list:
 			}
     ;
 condition:
-    ID comOp value 
+    ID comOp value
 		{
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, NULL, $1);
@@ -600,6 +602,8 @@ comOp:
     | LE { CONTEXT->comp = LESS_EQUAL; }
     | GE { CONTEXT->comp = GREAT_EQUAL; }
     | NE { CONTEXT->comp = NOT_EQUAL; }
+    | NOT LIKE { CONTEXT->comp = STRING_NOT_LIKE; }
+    | LIKE { CONTEXT->comp = STRING_LIKE; }
     ;
 
 load_data:
