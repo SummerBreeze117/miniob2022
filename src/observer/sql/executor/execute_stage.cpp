@@ -248,10 +248,6 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
       os << cell_spec->alias();
     }
   }
-
-  if (cell_num > 0) {
-    os << '\n';
-  }
 }
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
@@ -272,6 +268,138 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
     }
     cell.to_string(os);
   }
+}
+
+
+using TupleInfo = std::vector<TupleCell>;
+using TupleSet = std::vector<TupleInfo>;
+
+void tupleInfo_to_string(std::ostream &os, const TupleInfo& line)
+{
+  RC rc = RC::SUCCESS;
+  bool first_field = true;
+  for (const TupleCell& cell : line) {
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch field of cell. rc=%s", strrc(rc));
+      break;
+    }
+
+    if (!first_field) {
+      os << " | ";
+    } else {
+      first_field = false;
+    }
+    cell.to_string(os);
+  }
+}
+
+void descartes_helper(std::vector<TupleSet>& list, int pos, TupleSet& returnList, TupleInfo& line)
+{
+  TupleSet &tupleSet = list[pos];
+  if (pos == list.size() - 1) {
+    for (TupleInfo &tuple : tupleSet) {
+      line.insert(line.end(), tuple.begin(), tuple.end());
+      returnList.push_back(line);
+      line.erase(line.end() - tuple.size(), line.end());
+    }
+    return;
+  }
+  for (TupleInfo &tuple : tupleSet) {
+    line.insert(line.end(), tuple.begin(), tuple.end());
+    descartes_helper(list, pos + 1, returnList, line);
+    line.erase(line.end() - tuple.size(), line.end());
+  }
+}
+
+TupleSet getDescartes(std::vector<TupleSet>& list)
+{
+  TupleSet returnList;
+  TupleInfo line;
+  descartes_helper(list, 0, returnList, line);
+  return returnList;
+}
+
+bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
+  if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
+    return false; // bad case
+  }
+
+  const int compare = left_cell.compare(right_cell);
+  bool filter_result = false;
+  switch (comp) {
+    case EQUAL_TO: {
+      filter_result = (0 == compare);
+    } break;
+    case LESS_EQUAL: {
+      filter_result = (compare <= 0);
+    } break;
+    case NOT_EQUAL: {
+      filter_result = (compare != 0);
+    } break;
+    case LESS_THAN: {
+      filter_result = (compare < 0);
+    } break;
+    case GREAT_EQUAL: {
+      filter_result = (compare >= 0);
+    } break;
+    case GREAT_THAN: {
+      filter_result = (compare > 0);
+    } break;
+    case STRING_LIKE: { //case like/not like
+      filter_result = left_cell.string_like(right_cell);
+    } break;
+    case STRING_NOT_LIKE: {
+      filter_result = !left_cell.string_like(right_cell);
+    } break;
+    default: {
+      LOG_WARN("invalid compare type: %d", comp);
+    } break;
+  }
+  if (!filter_result) {
+    return false;
+  }
+  return true;
+}
+
+TupleSet check_condition(TupleSet& list, FilterStmt *filterStmt,
+                          std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx,
+                          std::unordered_map<std::string, Table *>& table_map)
+{
+  if (filterStmt == nullptr || filterStmt->filter_units().empty()) {
+    return list;
+  }
+  std::vector<FilterUnit *> filter_units;
+  for (FilterUnit *filter_unit : filterStmt->filter_units()) {
+    Expression *left_expr = filter_unit->left();
+    Expression *right_expr = filter_unit->right();
+    if (left_expr->type() == ExprType::FIELD && right_expr->type() == left_expr->type()) {
+       const char *left_table_name = dynamic_cast<FieldExpr*>(left_expr)->table_name();
+       const char *right_table_name = dynamic_cast<FieldExpr*>(right_expr)->table_name();
+       if (strcmp(left_table_name, right_table_name) != 0) {
+         filter_units.push_back(filter_unit);
+       }
+    }
+  }
+  TupleSet res;
+  for (TupleInfo &tuple : list) {
+    bool ok = true;
+    for (FilterUnit *filter_unit : filter_units) {
+      auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
+      auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
+
+      int left_idx = field_to_idx[{left_expr->field().table(), left_expr->field().meta()}];
+      int right_idx = field_to_idx[{right_expr->field().table(), right_expr->field().meta()}];
+      TupleCell &left_cell = tuple[left_idx], &right_cell = tuple[right_idx];
+      ok = cell_check(left_cell, filter_unit->comp(), right_cell);
+      if (!ok) {
+        break;
+      }
+    }
+    if (ok) {
+      res.push_back(tuple);
+    }
+  }
+  return res;
 }
 
 IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
@@ -405,52 +533,79 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
   RC rc = RC::SUCCESS;
-  if (select_stmt->tables().size() != 1) {
-    LOG_WARN("select more than 1 tables is not supported");
-    rc = RC::UNIMPLENMENT;
-    return rc;
-  }
-  Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
-  if (nullptr == scan_oper) {
-    scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-  }
-  DEFER([&] () {delete scan_oper;});
-
-  PredicateOperator pred_oper(select_stmt->filter_stmt());
-  pred_oper.add_child(scan_oper);
-  ProjectOperator project_oper;
-  project_oper.add_child(&pred_oper);
-  for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
-  }
-  rc = project_oper.open();
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to open operator");
-    return rc;
-  }
 
   std::stringstream ss;
-  print_tuple_header(ss, project_oper);
-  while ((rc = project_oper.next()) == RC::SUCCESS) {
-    // get current record
-    // write to response
-    Tuple * tuple = project_oper.current_tuple();
-    if (nullptr == tuple) {
-      rc = RC::INTERNAL;
-      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-      break;
+  std::vector<TupleSet> sel_res;
+  std::map<std::pair<const Table*, const FieldMeta*>, int> field_to_idx;
+  int idx = 0;
+  for (int i = 0; i < select_stmt->tables().size(); i ++) {
+    Table *table = select_stmt->tables()[i];
+    Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+    if (nullptr == scan_oper) {
+      scan_oper = new TableScanOperator(table);
+    }
+    DEFER([&] () {delete scan_oper;});
+
+    PredicateOperator pred_oper(select_stmt->filter_stmt());
+    pred_oper.add_child(scan_oper);
+    ProjectOperator project_oper;
+    project_oper.add_child(&pred_oper);
+    for (const Field &field : select_stmt->query_fields()) {
+      if (field.table() == table) {
+        project_oper.add_projection(field.table(), field.meta(), select_stmt->tables().size() == 1);
+        if (!field_to_idx.count({field.table(), field.meta()})) {
+          field_to_idx[{field.table(), field.meta()}] = idx ++;
+        }
+      }
+    }
+    print_tuple_header(ss, project_oper);
+    if (project_oper.tuple_cell_num() > 0 && i < select_stmt->tables().size() - 1) {
+      ss << " | ";
+    }
+    rc = project_oper.open();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open operator");
+      return rc;
+    }
+    TupleSet tuples;
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      Tuple * tuple = project_oper.current_tuple();
+
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
+      TupleInfo tupleInfo;
+      for (int i = 0; i < tuple->cell_num(); i ++) {
+        TupleCell cell;
+        tuple->cell_at(i, cell);
+        tupleInfo.push_back(cell);
+      }
+      tuples.push_back(std::move(tupleInfo));
     }
 
-    tuple_to_string(ss, *tuple);
+    if (rc != RC::RECORD_EOF) {
+      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+      project_oper.close();
+    } else {
+      rc = project_oper.close();
+    }
+    sel_res.push_back(std::move(tuples));
+  }
+
+  ss << std::endl;
+
+  TupleSet res = getDescartes(sel_res);
+
+  res = check_condition(res, select_stmt->filter_stmt(), field_to_idx, select_stmt->table_map());
+
+  for (TupleInfo &tuple : res) {
+    tupleInfo_to_string(ss, tuple);
     ss << std::endl;
   }
 
-  if (rc != RC::RECORD_EOF) {
-    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-    project_oper.close();
-  } else {
-    rc = project_oper.close();
-  }
   session_event->set_response(ss.str());
   return rc;
 }

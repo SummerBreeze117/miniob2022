@@ -50,14 +50,24 @@ Tuple *ProjectOperator::current_tuple()
   return &tuple_;
 }
 
-void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta)
+void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta, bool isSingle)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, field_meta));
-  spec->set_alias(field_meta->name());
+  if (isSingle) {
+    spec->set_alias(field_meta->name());
+  }
+  else {
+    std::string alia = std::string(table->name()) + "." + std::string(field_meta->name());
+    char *data = new char[alia.size() + 1]{};
+    memcpy(data, alia.c_str(), alia.size() + 1);
+    spec->set_alias(data);
+  }
   tuple_.add_cell_spec(spec);
 }
+
+
 
 RC ProjectOperator::tuple_cell_spec_at(int index, const TupleCellSpec *&spec) const
 {

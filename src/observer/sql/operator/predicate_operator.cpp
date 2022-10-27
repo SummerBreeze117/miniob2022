@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/record/record.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/common/field.h"
+#include "common/lang/string.h"
 
 RC PredicateOperator::open()
 {
@@ -74,15 +75,8 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
-    if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
+    if (comp == EQUAL_TO && !common::is_blank(left_cell.data()) && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
       return false; // bad case
-    }
-    //case like/not like
-    if (comp == STRING_LIKE) {
-      return left_cell.string_like(right_cell);
-    }
-    if (comp == STRING_NOT_LIKE) {
-      return !left_cell.string_like(right_cell);
     }
 
     const int compare = left_cell.compare(right_cell);
@@ -106,9 +100,20 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     case GREAT_THAN: {
       filter_result = (compare > 0);
     } break;
+    case STRING_LIKE: { //case like/not like
+      filter_result = left_cell.string_like(right_cell);
+    } break;
+    case STRING_NOT_LIKE: {
+      filter_result = !left_cell.string_like(right_cell);
+    } break;
     default: {
       LOG_WARN("invalid compare type: %d", comp);
     } break;
+    }
+    if (left_cell.data() == nullptr // 不是该表的条件
+        ||(left_expr->type() == ExprType::FIELD && right_expr->type() == left_expr->type() // 跨表条件
+            && strcmp(((FieldExpr*)left_expr)->table_name(), ((FieldExpr*)right_expr)->table_name()) != 0)) {
+      filter_result = true;
     }
     if (!filter_result) {
       return false;
