@@ -740,7 +740,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
     for (std::string &index_set_name : index_set_names) {
       if (index_sets_[index_set_name].size() == 1) {
         ss << tableMeta.name() << " | ";
-        ss << non_unique << " | ";
+        ss << 1 << " | ";
         ss << index_set_name << " | ";
         ss << 1 << " | ";
         ss << tableMeta.index(index_sets_[index_set_name][0].c_str())->field() << "\n";
@@ -749,7 +749,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
         int seq = 1;
         for (std::string &index_name : index_sets_[index_set_name]) {
           ss << tableMeta.name() << " | ";
-          ss << non_unique << " | ";
+          ss << 1 << " | ";
           ss << index_set_name << " | ";
           ss << seq ++ << " | ";
           std::string search_name(index_set_name.c_str());
