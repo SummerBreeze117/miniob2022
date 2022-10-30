@@ -432,7 +432,7 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     if (field->type() != value.type) { // 基本类型转换
       cast_type(field->type(), value, copy_len);
     }
-    if (field->type() == CHARS) {
+    if (field->type() == CHARS || field->type() == TEXTS) {
       const size_t data_len = strlen((const char *)value.data);
       if (copy_len > data_len) {
         copy_len = data_len + 1;

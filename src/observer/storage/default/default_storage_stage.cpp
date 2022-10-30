@@ -254,7 +254,7 @@ RC insert_record_from_file(
           value_init_float(&record_values[i], float_value);
         }
       } break;
-      case CHARS: {
+      case TEXTS: case CHARS: {
         value_init_string(&record_values[i], file_value.c_str());
       } break;
       default: {

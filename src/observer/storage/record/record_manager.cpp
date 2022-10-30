@@ -306,6 +306,11 @@ bool RecordPageHandler::is_full() const
   return page_header_->record_num >= page_header_->record_capacity;
 }
 
+bool RecordPageHandler::is_adaptable(int record_size) const
+{
+  return page_header_->record_real_size == record_size;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 RC RecordFileHandler::init(DiskBufferPool *buffer_pool)
@@ -364,7 +369,7 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   RecordPageHandler record_page_handler;
   bool page_found = false;
   PageNum current_page_num = 0;
-  while (!free_pages_.empty()) {
+  while (!free_pages_.empty() && !page_found) {
     current_page_num = *free_pages_.begin();
     ret = record_page_handler.init(*disk_buffer_pool_, current_page_num);
     if (ret != RC::SUCCESS) {
@@ -372,12 +377,17 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
       return ret;
     }
 
-    if (!record_page_handler.is_full()) {
-      page_found = true;
+    if (!record_page_handler.is_adaptable(record_size)) {
       break;
     }
-    record_page_handler.cleanup();
-    free_pages_.erase(free_pages_.begin());
+
+    if (record_page_handler.is_full()) {
+      record_page_handler.cleanup();
+      free_pages_.erase(free_pages_.begin());
+      break;
+    }
+
+    page_found = true;
   }
 
   // 找不到就分配一个新的页面

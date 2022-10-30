@@ -84,6 +84,7 @@ public:
   PageNum get_page_num() const;
 
   bool is_full() const;
+  bool is_adaptable(int record_size) const;
 
 protected:
   char *get_record_data(SlotNum slot_num)
