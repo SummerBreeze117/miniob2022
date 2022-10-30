@@ -681,6 +681,7 @@ RC ExecuteStage::do_drop_table(SQLStageEvent *sql_event)
 
 RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
 {
+  RC rc = RC::SUCCESS;
   SessionEvent *session_event = sql_event->session_event();
   Db *db = session_event->session()->get_current_db();
   const CreateIndex &create_index = sql_event->query()->sstr.create_index;
@@ -689,9 +690,19 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     session_event->set_response("FAILURE\n");
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
+  int attr_num = create_index.attr_num;
+  std::vector<std::string> index_set;
+  for (int i = attr_num - 1; i >= 0; i --) {
+    std::string index_name(create_index.index_name);
+    index_name += "_" + std::string(create_index.attributes[i].attribute_name);
+    rc = table->create_index(nullptr, index_name.c_str(), create_index.attributes[i].attribute_name);
+    if (rc == RC::SUCCESS) {
+      index_set.push_back(index_name);
+    } else break;
+  }
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
+  table->index_set_names().push_back(create_index.index_name);
+  table->index_sets()[create_index.index_name] = std::move(index_set);
   return rc;
 }
 
@@ -721,7 +732,32 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
   Table *table = db->find_table(table_name);
   std::stringstream ss;
   if (table != nullptr) {
-    table->table_meta().desc_index(ss);
+    const TableMeta &tableMeta = table->table_meta();
+    auto &index_set_names = table->index_set_names();
+    auto &index_sets_ = table->index_sets();
+    ss << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
+    int non_unique = index_sets_.size() != 1 ? 1 : 0;
+    for (std::string &index_set_name : index_set_names) {
+      if (index_sets_[index_set_name].size() == 1) {
+        ss << tableMeta.name() << " | ";
+        ss << non_unique << " | ";
+        ss << index_set_name << " | ";
+        ss << 1 << " | ";
+        ss << tableMeta.index(index_sets_[index_set_name][0].c_str())->field() << "\n";
+      }
+      else {
+        int seq = 1;
+        for (std::string &index_name : index_sets_[index_set_name]) {
+          ss << tableMeta.name() << " | ";
+          ss << non_unique << " | ";
+          ss << index_set_name << " | ";
+          ss << seq ++ << " | ";
+          std::string search_name(index_set_name.c_str());
+          search_name += "_" + index_name;
+          ss << tableMeta.index(index_name.c_str())->field() << "\n";
+        }
+      }
+    }
   } else {
     sql_event->session_event()->set_response("FAILURE\n");
     return RC::SCHEMA_TABLE_NOT_EXIST;

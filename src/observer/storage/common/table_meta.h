@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "rc.h"
 #include "storage/common/field_meta.h"
@@ -59,7 +60,7 @@ public:
   int get_serial_size() const override;
   void to_string(std::string &output) const override;
   void desc(std::ostream &os) const;
-  void desc_index(std::ostream &os) const;
+  void desc_index(std::ostream &os, std::unordered_map<std::string, std::vector<std::string>>&) const;
 
 protected:
   static RC init_sys_fields();
