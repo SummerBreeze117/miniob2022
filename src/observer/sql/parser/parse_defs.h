@@ -76,6 +76,8 @@ typedef struct {
   RelAttr attributes[MAX_NUM];    // attrs in Select clause
   size_t relation_num;            // Length of relations in Fro clause
   char *relations[MAX_NUM];       // relations in From clause
+  size_t join_relation_num;       // for inner join
+  char *join_relations[MAX_NUM];
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Selects;
@@ -220,6 +222,7 @@ void attr_info_destroy(AttrInfo *attr_info);
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
+void selects_append_join(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
 

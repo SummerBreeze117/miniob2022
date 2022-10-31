@@ -44,9 +44,29 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
-  // collect tables in `from` statement
+  // collect tables in `inner join` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
+  for (size_t i = 0; i < select_sql.join_relation_num; i ++) {
+    const char *table_name = select_sql.join_relations[i];
+    if (nullptr == table_name) {
+      LOG_WARN("invalid argument. relation name is null. index=%d", i);
+      return RC::INVALID_ARGUMENT;
+    }
+    if (table_map.find(table_name) != table_map.end()) { // from statement appeared
+      LOG_WARN("invalid argument. FROM statement appeared. table name=%s", table_name);
+      return RC::INVALID_ARGUMENT;
+    }
+    Table *table = db->find_table(table_name);
+    if (nullptr == table) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+
+    tables.push_back(table);
+    table_map.insert(std::pair<std::string, Table*>(table_name, table));
+  }
+  // collect tables in `from` statement
   for (size_t i = 0; i < select_sql.relation_num; i++) {
     const char *table_name = select_sql.relations[i];
     if (nullptr == table_name) {

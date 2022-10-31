@@ -141,6 +141,10 @@ void selects_append_relation(Selects *selects, const char *relation_name)
 {
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }
+void selects_append_join(Selects *selects, const char *relation_name)
+{
+  selects->join_relations[selects->join_relation_num++] = strdup(relation_name);
+}
 
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
 {

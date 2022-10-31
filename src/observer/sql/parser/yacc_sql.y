@@ -109,6 +109,8 @@ ParserContext *get_context(yyscan_t scanner)
         NE
         LIKE
         NOT //NOT LIKE
+        INNER
+        JOIN
 
 %union {
   struct _Attr *attr;
@@ -386,7 +388,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where SEMICOLON
+    SELECT select_attr FROM ID rel_list inner_join_list where SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -443,6 +445,13 @@ attr_list:
         // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=$2;
   	  }
   	;
+
+inner_join_list:
+    /* empty */
+    | INNER JOIN ID ON condition condition_list inner_join_list {
+    	selects_append_join(&CONTEXT->ssql->sstr.selection, $3);
+    }
+    ;
 
 rel_list:
     /* empty */
