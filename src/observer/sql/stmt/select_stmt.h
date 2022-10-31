@@ -40,11 +40,13 @@ public:
 public:
   const std::vector<Table *> &tables() const { return tables_; }
   const std::vector<Field> &query_fields() const { return query_fields_; }
+  const std::vector<Field> &query_fields_forprint() const { return query_fields_forprint_; }
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 
 private:
   std::vector<Field> query_fields_;
+  std::vector<Field> query_fields_forprint_;
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
   std::unordered_map<std::string, Table *> table_map_;

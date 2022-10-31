@@ -83,15 +83,15 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table*>(table_name, table));
   }
-  
+  std::reverse(tables.begin(), tables.end());
   // collect query fields in `select` statement
-  std::vector<Field> query_fields;
+  std::vector<Field> query_fields_forprint;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
 
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
       for (Table *table : tables) {
-        wildcard_fields(table, query_fields);
+        wildcard_fields(table, query_fields_forprint);
       }
 
     } else if (!common::is_blank(relation_attr.relation_name)) { // TODO
@@ -104,7 +104,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           return RC::SCHEMA_FIELD_MISSING;
         }
         for (Table *table : tables) {
-          wildcard_fields(table, query_fields);
+          wildcard_fields(table, query_fields_forprint);
         }
       } else {
         auto iter = table_map.find(table_name);
@@ -115,7 +115,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
         Table *table = iter->second;
         if (0 == strcmp(field_name, "*")) {
-          wildcard_fields(table, query_fields);
+          wildcard_fields(table, query_fields_forprint);
         } else {
           const FieldMeta *field_meta = table->table_meta().field(field_name);
           if (nullptr == field_meta) {
@@ -123,7 +123,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
             return RC::SCHEMA_FIELD_MISSING;
           }
 
-        query_fields.push_back(Field(table, field_meta));
+          query_fields_forprint.push_back(Field(table, field_meta));
         }
       }
     } else {
@@ -139,11 +139,20 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         return RC::SCHEMA_FIELD_MISSING;
       }
 
-      query_fields.push_back(Field(table, field_meta));
+      query_fields_forprint.push_back(Field(table, field_meta));
     }
   }
 
-  LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields.size());
+  std::vector<Field> query_fields;
+  if (tables.size() == 1) {
+    query_fields = query_fields_forprint;
+  } else {
+    for (Table *table : tables) {
+      wildcard_fields(table, query_fields);
+    }
+  }
+
+  LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields_forprint.size());
 
   Table *default_table = nullptr;
   if (tables.size() == 1) {
@@ -161,10 +170,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
-  std::reverse(tables.begin(), tables.end());
   select_stmt->table_map_.swap(table_map);
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
+  select_stmt->query_fields_forprint_.swap(query_fields_forprint);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt = select_stmt;
   return RC::SUCCESS;

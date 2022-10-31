@@ -249,6 +249,32 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     }
   }
 }
+void print_tuple_header_withList(std::ostream &os,
+                                const std::vector<Field>& query_fields_forprint_,
+                                bool isSingle)
+{
+  if (isSingle) {
+    for (size_t i = 0; i < query_fields_forprint_.size(); i ++) {
+      if (i != 0) {
+        os << " | ";
+      }
+      const char *field_name = query_fields_forprint_[i].field_name();
+      os << field_name;
+    }
+  }
+  else {
+    for (size_t i = 0; i < query_fields_forprint_.size(); i ++) {
+      if (i != 0) {
+        os << " | ";
+      }
+      const char *table_name = query_fields_forprint_[i].table_name();
+      const char *field_name = query_fields_forprint_[i].field_name();
+      std::string info = std::string (table_name) + "." + std::string(field_name);
+      os << info;
+    }
+  }
+  os << std::endl;
+}
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -283,7 +309,32 @@ void tupleInfo_to_string(std::ostream &os, const TupleInfo& line)
       LOG_WARN("failed to fetch field of cell. rc=%s", strrc(rc));
       break;
     }
+    if (!first_field) {
+      os << " | ";
+    } else {
+      first_field = false;
+    }
+    cell.to_string(os);
+  }
+}
 
+void tupleInfo_to_string_with_tables(std::ostream &os,
+                                    TupleInfo& line,
+                                    std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx,
+                                    const std::vector<Field>& query_fields_forprint_)
+{
+  RC rc = RC::SUCCESS;
+  bool first_field = true;
+  std::vector<int> idxes;
+  for (const Field &field : query_fields_forprint_) {
+    idxes.push_back(field_to_idx[{field.table(), field.meta()}]);
+  }
+  for (int idx : idxes) {
+    const TupleCell& cell = line[idx];
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch field of cell. rc=%s", strrc(rc));
+      break;
+    }
     if (!first_field) {
       os << " | ";
     } else {
@@ -558,10 +609,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         }
       }
     }
-    print_tuple_header(ss, project_oper);
-    if (project_oper.tuple_cell_num() > 0 && i < select_stmt->tables().size() - 1) {
-      ss << " | ";
-    }
+//    print_tuple_header(ss, project_oper);
+//    if (project_oper.tuple_cell_num() > 0 && i < select_stmt->tables().size() - 1) {
+//      ss << " | ";
+//    }
     rc = project_oper.open();
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to open operator");
@@ -595,15 +646,22 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     sel_res.push_back(std::move(tuples));
   }
 
-  ss << std::endl;
-
   TupleSet res = getDescartes(sel_res);
 
   res = check_condition(res, select_stmt->filter_stmt(), field_to_idx, select_stmt->table_map());
 
-  for (TupleInfo &tuple : res) {
-    tupleInfo_to_string(ss, tuple);
-    ss << std::endl;
+  print_tuple_header_withList(ss, select_stmt->query_fields_forprint(), select_stmt->tables().size() == 1);
+
+  if (select_stmt->tables().size() == 1) {
+    for (TupleInfo &tuple : res) {
+      tupleInfo_to_string(ss, tuple);
+      ss << std::endl;
+    }
+  } else {
+    for (TupleInfo &tuple : res) {
+      tupleInfo_to_string_with_tables(ss, tuple, field_to_idx, select_stmt->query_fields_forprint());
+      ss << std::endl;
+    }
   }
 
   session_event->set_response(ss.str());
