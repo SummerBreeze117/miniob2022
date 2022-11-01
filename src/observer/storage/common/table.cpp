@@ -719,23 +719,41 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
 RC Table::update_record(Trx *trx, Record *record, const FieldMeta *field, const Value value)
 {
   RC rc = RC::SUCCESS;
-  if (trx) {
-
-  } else {
-    size_t copy_len = field->len();
-    if (field->type() != value.type) {
-      cast_type(field->type(), value, copy_len);
-    }
-    if (field->type() == CHARS) {
-      const size_t data_len = strlen((const char *)value.data);
-      if (copy_len > data_len) {
-        copy_len = data_len + 1;
-      }
-    }
-    // ?????????????
-    memcpy(record->data() + field->offset(), value.data, copy_len);
-    rc = record_handler_->update_record(record);
+  size_t copy_len = field->len();
+  if (field->type() != value.type) {
+    cast_type(field->type(), value, copy_len);
   }
+  if (field->type() == CHARS || field->type() == TEXTS) {
+    const size_t data_len = strlen((const char *)value.data);
+    if (copy_len > data_len) {
+      copy_len = data_len + 1;
+    }
+  }
+  memcpy(record->data() + field->offset(), value.data, copy_len);
+  rc = record_handler_->update_record(record);
+
+  if (trx != nullptr) {
+    rc = trx->update_record(this, record);
+
+    CLogRecord *clog_record = nullptr;
+    rc = clog_manager_->clog_gen_record(CLogType::REDO_UPDATE, trx->get_current_id(), clog_record, name(), table_meta_.record_size(), record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    rc = clog_manager_->clog_append_record(clog_record);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
+
+  return rc;
+}
+
+RC Table::recover_update_record(Record *record)
+{
+  RC rc = RC::SUCCESS;
+  rc = record_handler_->update_record(record);
   return rc;
 }
 

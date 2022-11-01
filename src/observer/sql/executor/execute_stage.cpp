@@ -760,6 +760,11 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   RC rc = RC::SUCCESS;
   UpdateStmt *updateStmt = dynamic_cast<UpdateStmt*>(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  Session *session = session_event->session();
+  Db *db = session->get_current_db();
+  Trx *trx = session->current_trx();
+  CLogManager *clog_manager = db->get_clog_manager();
+
   Operator *scan_oper = try_to_create_index_scan_operator(updateStmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(updateStmt->table());
@@ -768,7 +773,7 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
 
   PredicateOperator pred_oper(updateStmt->filter_stmt());
   pred_oper.add_child(scan_oper);
-  UpdateOperator update_oper(updateStmt);
+  UpdateOperator update_oper(updateStmt, trx);
   update_oper.add_child(&pred_oper);
   rc = update_oper.open();
 
@@ -776,6 +781,23 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
     session_event->set_response("FAILURE\n");
   } else {
     session_event->set_response("SUCCESS\n");
+    if (!session->is_trx_multi_operation_mode()) {
+      CLogRecord *clog_record = nullptr;
+      rc = clog_manager->clog_gen_record(CLogType::REDO_MTR_COMMIT, trx->get_current_id(), clog_record);
+      if (rc != RC::SUCCESS || clog_record == nullptr) {
+        session_event->set_response("FAILURE\n");
+        return rc;
+      }
+
+      rc = clog_manager->clog_append_record(clog_record);
+      if (rc != RC::SUCCESS) {
+        session_event->set_response("FAILURE\n");
+        return rc;
+      }
+
+      trx->next_current_id();
+      session_event->set_response("SUCCESS\n");
+    }
   }
   return rc;
 }
