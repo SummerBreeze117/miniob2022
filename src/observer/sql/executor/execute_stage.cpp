@@ -344,32 +344,6 @@ void tupleInfo_to_string_with_tables(std::ostream &os,
   }
 }
 
-void descartes_helper(std::vector<TupleSet>& list, int pos, TupleSet& returnList, TupleInfo& line)
-{
-  TupleSet &tupleSet = list[pos];
-  if (pos == list.size() - 1) {
-    for (TupleInfo &tuple : tupleSet) {
-      line.insert(line.end(), tuple.begin(), tuple.end());
-      returnList.push_back(line);
-      line.erase(line.end() - tuple.size(), line.end());
-    }
-    return;
-  }
-  for (TupleInfo &tuple : tupleSet) {
-    line.insert(line.end(), tuple.begin(), tuple.end());
-    descartes_helper(list, pos + 1, returnList, line);
-    line.erase(line.end() - tuple.size(), line.end());
-  }
-}
-
-TupleSet getDescartes(std::vector<TupleSet>& list)
-{
-  TupleSet returnList;
-  TupleInfo line;
-  descartes_helper(list, 0, returnList, line);
-  return returnList;
-}
-
 bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
     return false; // bad case
@@ -412,9 +386,90 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   return true;
 }
 
+
+void descartes_helper(std::vector<TupleSet>& list, int pos, TupleSet& returnList, TupleInfo& line)
+{
+  TupleSet &tupleSet = list[pos];
+  if (pos == list.size() - 1) {
+    for (TupleInfo &tuple : tupleSet) {
+      line.insert(line.end(), tuple.begin(), tuple.end());
+      returnList.push_back(line);
+      line.erase(line.end() - tuple.size(), line.end());
+    }
+    return;
+  }
+  for (TupleInfo &tuple : tupleSet) {
+    line.insert(line.end(), tuple.begin(), tuple.end());
+    descartes_helper(list, pos + 1, returnList, line);
+    line.erase(line.end() - tuple.size(), line.end());
+  }
+}
+
+TupleSet getDescartes(std::vector<TupleSet>& list)
+{
+  TupleSet returnList;
+  TupleInfo line;
+  descartes_helper(list, 0, returnList, line);
+  return returnList;
+}
+
+void descartes_helper_with_innerjoin(std::vector<TupleSet>& list, int pos,
+                                      TupleSet& returnList,
+                                      TupleInfo& line,
+                                      std::vector<FilterUnit *> &filter_units,
+                                      std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
+{
+  TupleSet &tupleSet = list[pos];
+  if (pos > 1) {
+    FilterUnit *filter_unit = filter_units[pos - 1];
+    auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
+    auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
+
+    int left_idx = field_to_idx[{left_expr->field().table(), left_expr->field().meta()}];
+    int right_idx = field_to_idx[{right_expr->field().table(), right_expr->field().meta()}];
+    TupleCell &left_cell = line[left_idx], &right_cell = line[right_idx];
+    if (!cell_check(left_cell, filter_unit->comp(), right_cell)) {
+      return;
+    }
+  }
+  if (pos == list.size() - 1) {
+    for (TupleInfo &tuple : tupleSet) {
+      line.insert(line.end(), tuple.begin(), tuple.end());
+      returnList.push_back(line);
+      line.erase(line.end() - tuple.size(), line.end());
+    }
+    return;
+  }
+  for (TupleInfo &tuple : tupleSet) {
+    line.insert(line.end(), tuple.begin(), tuple.end());
+    descartes_helper(list, pos + 1, returnList, line);
+    line.erase(line.end() - tuple.size(), line.end());
+  }
+}
+
+TupleSet getDescartes_with_innerjoin(std::vector<TupleSet>& list, FilterStmt *filterStmt,
+                                    std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
+{
+  std::vector<FilterUnit *> filter_units;
+  for (FilterUnit *filter_unit : filterStmt->filter_units()) {
+    Expression *left_expr = filter_unit->left();
+    Expression *right_expr = filter_unit->right();
+    if (left_expr->type() == ExprType::FIELD && right_expr->type() == left_expr->type()) {
+      const char *left_table_name = dynamic_cast<FieldExpr*>(left_expr)->table_name();
+      const char *right_table_name = dynamic_cast<FieldExpr*>(right_expr)->table_name();
+      if (strcmp(left_table_name, right_table_name) != 0) {
+        filter_units.push_back(filter_unit);
+      }
+    }
+  }
+  TupleSet returnList;
+  TupleInfo line;
+  descartes_helper_with_innerjoin(list, 0, returnList, line, filter_units, field_to_idx);
+  return returnList;
+}
+
 TupleSet check_condition(TupleSet& list, FilterStmt *filterStmt,
-                          std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx,
-                          std::unordered_map<std::string, Table *>& table_map)
+                          std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
 {
   if (filterStmt == nullptr || filterStmt->filter_units().empty()) {
     return list;
@@ -609,10 +664,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         }
       }
     }
-//    print_tuple_header(ss, project_oper);
-//    if (project_oper.tuple_cell_num() > 0 && i < select_stmt->tables().size() - 1) {
-//      ss << " | ";
-//    }
     rc = project_oper.open();
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to open operator");
@@ -646,9 +697,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     sel_res.push_back(std::move(tuples));
   }
 
-  TupleSet res = getDescartes(sel_res);
+  TupleSet res;
+  if (select_stmt->is_inner_join()) {
+    res = getDescartes_with_innerjoin(sel_res, select_stmt->filter_stmt(), field_to_idx);
+  }
+  else {
+    res = getDescartes(sel_res);
+  }
 
-  res = check_condition(res, select_stmt->filter_stmt(), field_to_idx, select_stmt->table_map());
+  res = check_condition(res, select_stmt->filter_stmt(), field_to_idx);
 
   print_tuple_header_withList(ss, select_stmt->query_fields_forprint(), select_stmt->tables().size() == 1);
 

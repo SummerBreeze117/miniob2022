@@ -172,6 +172,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->table_map_.swap(table_map);
   select_stmt->tables_.swap(tables);
+  select_stmt->is_inner_join_ = select_sql.join_relation_num > 0;
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->query_fields_forprint_.swap(query_fields_forprint);
   select_stmt->filter_stmt_ = filter_stmt;
