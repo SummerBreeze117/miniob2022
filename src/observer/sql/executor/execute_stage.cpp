@@ -457,12 +457,12 @@ TupleSet getDescartes_with_innerjoin(std::vector<TupleSet>& list, FilterStmt *fi
     if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == left_expr->type()) {
       if (strcmp(left_expr->table_name(), right_expr->table_name()) != 0) {
         if (std::string(left_expr->table_name()) > std::string(right_expr->table_name())) {
-          while (left_expr->field().table() != tables[idx]) {
+          while (idx < list.size() && left_expr->field().table() != tables[idx]) {
             idx ++;
           }
         }
         else {
-          while (right_expr->field().table() != tables[idx]) {
+          while (idx < list.size() && right_expr->field().table() != tables[idx]) {
             idx ++;
           }
         }
@@ -470,7 +470,7 @@ TupleSet getDescartes_with_innerjoin(std::vector<TupleSet>& list, FilterStmt *fi
       }
     }
   }
-  std::vector<FilterUnit *> filter_units(list.size());
+  std::vector<FilterUnit *> filter_units(list.size() + 1);
   for (const auto& item : filter_for_tableIdx) {
     filter_units[item.second] = item.first;
   }
