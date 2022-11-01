@@ -422,45 +422,57 @@ void descartes_helper_with_innerjoin(std::vector<TupleSet>& list, int pos,
   TupleSet &tupleSet = list[pos];
   if (pos > 1) {
     FilterUnit *filter_unit = filter_units[pos - 1];
-    auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
-    auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
+    if (filter_unit) {
+      auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
+      auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
 
-    int left_idx = field_to_idx[{left_expr->field().table(), left_expr->field().meta()}];
-    int right_idx = field_to_idx[{right_expr->field().table(), right_expr->field().meta()}];
-    TupleCell &left_cell = line[left_idx], &right_cell = line[right_idx];
-    if (!cell_check(left_cell, filter_unit->comp(), right_cell)) {
-      return;
+      int left_idx = field_to_idx[{left_expr->field().table(), left_expr->field().meta()}];
+      int right_idx = field_to_idx[{right_expr->field().table(), right_expr->field().meta()}];
+      TupleCell &left_cell = line[left_idx], &right_cell = line[right_idx];
+      if (!cell_check(left_cell, filter_unit->comp(), right_cell)) {
+        return;
+      }
     }
   }
-  if (pos == list.size() - 1) {
-    for (TupleInfo &tuple : tupleSet) {
-      line.insert(line.end(), tuple.begin(), tuple.end());
-      returnList.push_back(line);
-      line.erase(line.end() - tuple.size(), line.end());
-    }
+  if (pos == list.size()) {
+    returnList.push_back(line);
     return;
   }
   for (TupleInfo &tuple : tupleSet) {
     line.insert(line.end(), tuple.begin(), tuple.end());
-    descartes_helper(list, pos + 1, returnList, line);
+    descartes_helper_with_innerjoin(list, pos + 1, returnList, line, filter_units, field_to_idx);
     line.erase(line.end() - tuple.size(), line.end());
   }
 }
 
 TupleSet getDescartes_with_innerjoin(std::vector<TupleSet>& list, FilterStmt *filterStmt,
-                                    std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
+                                    std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx,
+                                    const std::vector<Table*>& tables)
 {
-  std::vector<FilterUnit *> filter_units;
+  std::unordered_map<FilterUnit*, int> filter_for_tableIdx;
+  int idx = 1;
   for (FilterUnit *filter_unit : filterStmt->filter_units()) {
-    Expression *left_expr = filter_unit->left();
-    Expression *right_expr = filter_unit->right();
-    if (left_expr->type() == ExprType::FIELD && right_expr->type() == left_expr->type()) {
-      const char *left_table_name = dynamic_cast<FieldExpr*>(left_expr)->table_name();
-      const char *right_table_name = dynamic_cast<FieldExpr*>(right_expr)->table_name();
-      if (strcmp(left_table_name, right_table_name) != 0) {
-        filter_units.push_back(filter_unit);
+    auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
+    auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
+    if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == left_expr->type()) {
+      if (strcmp(left_expr->table_name(), right_expr->table_name()) != 0) {
+        if (std::string(left_expr->table_name()) > std::string(right_expr->table_name())) {
+          while (left_expr->field().table() != tables[idx]) {
+            idx ++;
+          }
+        }
+        else {
+          while (right_expr->field().table() != tables[idx]) {
+            idx ++;
+          }
+        }
+        filter_for_tableIdx[filter_unit] = idx ++;
       }
     }
+  }
+  std::vector<FilterUnit *> filter_units(list.size());
+  for (const auto& item : filter_for_tableIdx) {
+    filter_units[item.second] = item.first;
   }
   TupleSet returnList;
   TupleInfo line;
@@ -699,7 +711,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   TupleSet res;
   if (select_stmt->is_inner_join()) {
-    res = getDescartes_with_innerjoin(sel_res, select_stmt->filter_stmt(), field_to_idx);
+    res = getDescartes_with_innerjoin(sel_res, select_stmt->filter_stmt(), field_to_idx, select_stmt->tables());
   }
   else {
     res = getDescartes(sel_res);
