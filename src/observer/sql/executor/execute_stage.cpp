@@ -728,7 +728,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   TupleSet res;
-  if (select_stmt->is_inner_join()) {
+  if (select_stmt->is_inner_join() && select_stmt->tables().size() >= 3) {
     res = getDescartes_with_innerjoin(sel_res, select_stmt->filter_stmt(), field_to_idx, select_stmt->tables());
   }
   else {
