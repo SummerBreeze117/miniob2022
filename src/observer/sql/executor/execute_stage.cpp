@@ -449,31 +449,49 @@ TupleSet getDescartes_with_innerjoin(std::vector<TupleSet>& list, FilterStmt *fi
                                     std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx,
                                     const std::vector<Table*>& tables)
 {
-  std::unordered_map<FilterUnit*, int> filter_for_tableIdx;
-  int idx = 1;
+  std::vector<FilterUnit *> filter_units_first;
+  std::vector<FilterUnit *> filter_units(list.size() + 1);
   for (FilterUnit *filter_unit : filterStmt->filter_units()) {
     auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
     auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
     if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == left_expr->type()) {
       if (strcmp(left_expr->table_name(), right_expr->table_name()) != 0) {
-        if (std::string(left_expr->table_name()) > std::string(right_expr->table_name())) {
-          while (idx < list.size() && left_expr->field().table() != tables[idx]) {
-            idx ++;
-          }
-        }
-        else {
-          while (idx < list.size() && right_expr->field().table() != tables[idx]) {
-            idx ++;
-          }
-        }
-        filter_for_tableIdx[filter_unit] = idx ++;
+        filter_units_first.push_back(filter_unit);
       }
     }
   }
-  std::vector<FilterUnit *> filter_units(list.size() + 1);
-  for (const auto& item : filter_for_tableIdx) {
-    filter_units[item.second] = item.first;
+  if (filter_units_first.size() == list.size() - 1) {
+    for (size_t i = 0; i < filter_units_first.size(); i ++) {
+      filter_units[i + 1] = filter_units_first[i];
+    }
   }
+  else {
+    std::unordered_map<FilterUnit*, int> filter_for_tableIdx;
+    int idx = 1;
+    for (FilterUnit *filter_unit : filterStmt->filter_units()) {
+      auto *left_expr = dynamic_cast<FieldExpr*>(filter_unit->left());
+      auto *right_expr = dynamic_cast<FieldExpr*>(filter_unit->right());
+      if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == left_expr->type()) {
+        if (strcmp(left_expr->table_name(), right_expr->table_name()) != 0) {
+          if (std::string(left_expr->table_name()) > std::string(right_expr->table_name())) {
+            while (idx < list.size() && left_expr->field().table() != tables[idx]) {
+              idx ++;
+            }
+          }
+          else {
+            while (idx < list.size() && right_expr->field().table() != tables[idx]) {
+              idx ++;
+            }
+          }
+          filter_for_tableIdx[filter_unit] = idx ++;
+        }
+      }
+    }
+    for (const auto& item : filter_for_tableIdx) {
+      filter_units[item.second] = item.first;
+    }
+  }
+
   TupleSet returnList;
   TupleInfo line;
   descartes_helper_with_innerjoin(list, 0, returnList, line, filter_units, field_to_idx);
