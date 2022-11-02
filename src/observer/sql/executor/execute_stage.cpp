@@ -508,10 +508,12 @@ void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
             cast_float = atof(tuple[idx].data());
           } else if (tuple[idx].attr_type() == INTS) {
             cast_float = *(int *)tuple[idx].data();
+          } else {
+            cast_float = *(float *)tuple[idx].data();
           }
           sum += cast_float;
         }
-        os << sum;
+        os << double2string(sum);
       } break;
     }
   }
