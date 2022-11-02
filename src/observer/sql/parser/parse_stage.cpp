@@ -132,7 +132,16 @@ RC ParseStage::handle_request(StageEvent *event)
   RC ret = parse(sql.c_str(), query_result);
   if (ret != RC::SUCCESS) {
     // set error information to event
-    sql_event->session_event()->set_response("Failed to parse sql\n");
+    if (sql.find("min") != -1 || sql.find("MIN") != -1 ||
+        sql.find("max") != -1 || sql.find("MAX") != -1 ||
+        sql.find("avg") != -1 || sql.find("AVG") != -1 ||
+        sql.find("sum") != -1 || sql.find("SUM") != -1 ||
+        sql.find("count") != -1 || sql.find("COUNT") != -1) {
+      sql_event->session_event()->set_response("FAILURE\n");
+    }
+    else {
+      sql_event->session_event()->set_response("Failed to parse sql\n");
+    }
     query_destroy(query_result);
     return RC::INTERNAL;
   }
