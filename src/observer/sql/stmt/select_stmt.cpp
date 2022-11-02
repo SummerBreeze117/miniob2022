@@ -165,6 +165,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   std::vector<Aggregation> aggregations;
   if (select_sql.aggregation_num) {
     for (int i = 0; i < select_sql.aggregation_num; i ++) {
+      if (strcmp(select_sql.aggregations[i].attribute.attribute_name, "*") == 0 &&
+          select_sql.aggregations[i].func_name != FuncName::AGG_COUNT) {
+        return RC::MISMATCH;
+      }
       aggregations.push_back(select_sql.aggregations[i]);
     }
     for (Table *table : tables) {
