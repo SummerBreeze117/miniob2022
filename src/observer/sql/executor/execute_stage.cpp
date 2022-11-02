@@ -431,7 +431,7 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   return true;
 }
 
-void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
+RC do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
                     const std::vector<Aggregation>& aggregations,
                     std::unordered_map<std::string, Table*>& table_map,
                     std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
@@ -449,6 +449,9 @@ void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
       table = default_table;
     }
     const FieldMeta *field = table->table_meta().field(aggregation.attribute.attribute_name);
+    if (field == nullptr && strcmp(aggregation.attribute.attribute_name, "*") != 0) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
     int idx = field_to_idx[{table, field}];
     int re;
     switch (aggregation.func_name) {
@@ -518,6 +521,7 @@ void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
     }
   }
   os << std::endl;
+  return RC::SUCCESS;
 }
 
 void descartes_helper(std::vector<TupleSet>& list, int pos, TupleSet& returnList, TupleInfo& line)
@@ -872,7 +876,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   std::stringstream ss;
   if (select_stmt->aggregations().size()) { //聚合函数
     print_header_for_aggregation(ss, select_stmt->aggregations());
-    do_aggregation(ss, res, select_stmt->tables()[0], select_stmt->aggregations(), select_stmt->table_map(), field_to_idx);
+    RC rc = do_aggregation(ss, res, select_stmt->tables()[0], select_stmt->aggregations(), select_stmt->table_map(), field_to_idx);
+    if (rc != RC::SUCCESS) {
+      session_event->set_response("FAILURE\n");
+      return rc;
+    }
   } else { //普通查询
     print_tuple_header_withList(ss, select_stmt->query_fields_forprint(), select_stmt->tables().size() == 1);
     if (select_stmt->tables().size() == 1) {
