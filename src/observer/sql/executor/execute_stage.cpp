@@ -46,6 +46,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/condition_filter.h"
 #include "storage/trx/trx.h"
 #include "storage/clog/clog.h"
+#include "util/util.h"
 
 using namespace common;
 
@@ -497,7 +498,7 @@ void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
           }
           sum += cast_float;
         }
-        os << sum / static_cast<float>(tupleSet.size());
+        os << double2string(sum / static_cast<float>(tupleSet.size()));
       } break;
       case AGG_SUM: {
         float sum = 0.0;
