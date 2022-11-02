@@ -319,6 +319,7 @@ RC Table::insert_record(Trx *trx, Record *record)
 }
 
 void Table::cast_type(AttrType type, Value value, size_t len)
+                                                  /*len = 4*/
 {
   switch (type) {
     case CHARS: {

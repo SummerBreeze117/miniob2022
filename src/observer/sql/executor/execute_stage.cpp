@@ -275,6 +275,48 @@ void print_tuple_header_withList(std::ostream &os,
   }
   os << std::endl;
 }
+
+void print_header_for_aggregation(std::ostream &os, const std::vector<Aggregation>& aggregations)
+{
+  for (size_t i = 0; i < aggregations.size(); i ++) {
+    const Aggregation &aggregation = aggregations[i];
+    if (i != 0) {
+      os << " | ";
+    }
+    switch (aggregation.func_name) {
+      case AGG_MAX: {
+        os << "max(";
+      } break;
+      case AGG_MIN: {
+        os << "min(";
+      } break;
+      case AGG_COUNT: {
+        os << "count(";
+      } break;
+      case AGG_AVG: {
+        os << "avg(";
+      } break;
+      case AGG_SUM: {
+        os << "sum(";
+      } break;
+    }
+    if (aggregation.is_value) {
+      TupleCell cell(aggregation.value.type, static_cast<char*>(aggregation.value.data));
+      cell.to_string(os);
+    } else {
+      std::string info;
+      if (aggregation.attribute.relation_name != nullptr &&
+          !common::is_blank(aggregation.attribute.relation_name)) {
+        info += std::string(aggregation.attribute.relation_name) + ".";
+      }
+      info += std::string(aggregation.attribute.attribute_name);
+      os << info;
+    }
+    os << ")";
+  }
+  os << std::endl;
+}
+
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -316,6 +358,7 @@ void tupleInfo_to_string(std::ostream &os, const TupleInfo& line)
     }
     cell.to_string(os);
   }
+  os << std::endl;
 }
 
 void tupleInfo_to_string_with_tables(std::ostream &os,
@@ -342,6 +385,7 @@ void tupleInfo_to_string_with_tables(std::ostream &os,
     }
     cell.to_string(os);
   }
+  os << std::endl;
 }
 
 bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
@@ -386,6 +430,90 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   return true;
 }
 
+void do_aggregation(std::ostream &os, TupleSet& tupleSet, Table *default_table,
+                    const std::vector<Aggregation>& aggregations,
+                    std::unordered_map<std::string, Table*>& table_map,
+                    std::map<std::pair<const Table*, const FieldMeta*>, int>& field_to_idx)
+{
+  for (size_t i = 0; i < aggregations.size(); i ++) {
+    const Aggregation &aggregation = aggregations[i];
+    if (i != 0) {
+      os << " | ";
+    }
+    Table *table = nullptr;
+    if (aggregation.attribute.relation_name != nullptr &&
+        !common::is_blank(aggregation.attribute.relation_name)) {
+      table = table_map[aggregation.attribute.relation_name];
+    } else {
+      table = default_table;
+    }
+    const FieldMeta *field = table->table_meta().field(aggregation.attribute.attribute_name);
+    int idx = field_to_idx[{table, field}];
+    int re;
+    switch (aggregation.func_name) {
+      case AGG_MAX: {
+        TupleCell cell;
+        bool isFirst = true;
+        for (TupleInfo &tuple : tupleSet) {
+          if (isFirst) {
+            cell = tuple[idx];
+            isFirst = false;
+          } else {
+            if (cell_check(tuple[idx], CompOp::GREAT_THAN, cell)) {
+              cell = tuple[idx];
+            }
+          }
+        }
+        cell.to_string(os);
+      } break;
+      case AGG_MIN: {
+        TupleCell cell;
+        bool isFirst = true;
+        for (TupleInfo &tuple : tupleSet) {
+          if (isFirst) {
+            cell = tuple[idx];
+            isFirst = false;
+          } else {
+            if (cell_check(tuple[idx], CompOp::LESS_THAN, cell)) {
+              cell = tuple[idx];
+            }
+          }
+        }
+        cell.to_string(os);
+      } break;
+      case AGG_COUNT: {
+        os << tupleSet.size();
+      } break;
+      case AGG_AVG: {
+        float sum = 0.0;
+        for (TupleInfo &tuple : tupleSet) {
+          float cast_float;
+          if (tuple[idx].attr_type() == CHARS) {
+            cast_float = atof(tuple[idx].data());
+          } else if (tuple[idx].attr_type() == INTS) {
+            cast_float = *(int *)tuple[idx].data();
+          }
+          sum += cast_float;
+        }
+        os << sum / static_cast<float>(tupleSet.size());
+      } break;
+      case AGG_SUM: {
+        float sum = 0.0;
+        for (TupleInfo &tuple : tupleSet) {
+          float cast_float;
+          if (tuple[idx].attr_type() == CHARS) {
+            cast_float = atof(tuple[idx].data());
+          } else if (tuple[idx].attr_type() == INTS) {
+            cast_float = *(int *)tuple[idx].data();
+          }
+          sum += cast_float;
+        }
+        os << sum;
+      } break;
+    }
+  }
+  os << std::endl;
+}
 
 void descartes_helper(std::vector<TupleSet>& list, int pos, TupleSet& returnList, TupleInfo& line)
 {
@@ -670,7 +798,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   RC rc = RC::SUCCESS;
 
-  std::stringstream ss;
   std::vector<TupleSet> sel_res;
   std::map<std::pair<const Table*, const FieldMeta*>, int> field_to_idx;
   int idx = 0;
@@ -736,18 +863,21 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   res = check_condition(res, select_stmt->filter_stmt(), field_to_idx);
-
-  print_tuple_header_withList(ss, select_stmt->query_fields_forprint(), select_stmt->tables().size() == 1);
-
-  if (select_stmt->tables().size() == 1) {
-    for (TupleInfo &tuple : res) {
-      tupleInfo_to_string(ss, tuple);
-      ss << std::endl;
-    }
-  } else {
-    for (TupleInfo &tuple : res) {
-      tupleInfo_to_string_with_tables(ss, tuple, field_to_idx, select_stmt->query_fields_forprint());
-      ss << std::endl;
+  // 输出环节
+  std::stringstream ss;
+  if (select_stmt->aggregations().size()) { //聚合函数
+    print_header_for_aggregation(ss, select_stmt->aggregations());
+    do_aggregation(ss, res, select_stmt->tables()[0], select_stmt->aggregations(), select_stmt->table_map(), field_to_idx);
+  } else { //普通查询
+    print_tuple_header_withList(ss, select_stmt->query_fields_forprint(), select_stmt->tables().size() == 1);
+    if (select_stmt->tables().size() == 1) {
+      for (TupleInfo &tuple : res) {
+        tupleInfo_to_string(ss, tuple);
+      }
+    } else {
+      for (TupleInfo &tuple : res) {
+        tupleInfo_to_string_with_tables(ss, tuple, field_to_idx, select_stmt->query_fields_forprint());
+      }
     }
   }
 

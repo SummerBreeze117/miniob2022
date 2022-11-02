@@ -117,6 +117,14 @@ void condition_destroy(Condition *condition)
   }
 }
 
+void aggregation_destroy(Aggregation *aggregation) {
+  if (aggregation->is_value) {
+    value_destroy(&aggregation->value);
+  } else {
+    relation_attr_destroy(&aggregation->attribute);
+  }
+}
+
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length)
 {
   attr_info->name = strdup(name);
@@ -155,6 +163,11 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   selects->condition_num = condition_num;
 }
 
+void selects_append_aggregation(Selects *selects, Aggregation *aggregation)
+{
+  selects->aggregations[selects->aggregation_num++] = *aggregation;
+}
+
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {
@@ -172,6 +185,11 @@ void selects_destroy(Selects *selects)
     condition_destroy(&selects->conditions[i]);
   }
   selects->condition_num = 0;
+
+  for (size_t i = 0; i < selects->aggregation_num; i++) {
+    aggregation_destroy(&selects->aggregations[i]);
+  }
+  selects->aggregation_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, InsertTuple tuples[], size_t tuple_num)

@@ -44,10 +44,11 @@ public:
   bool is_inner_join() const { return is_inner_join_; }
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
-
+  const std::vector<Aggregation>& aggregations() const { return aggregations_; }
 private:
   std::vector<Field> query_fields_;
   std::vector<Field> query_fields_forprint_;
+  std::vector<Aggregation> aggregations_;
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
   std::unordered_map<std::string, Table *> table_map_;

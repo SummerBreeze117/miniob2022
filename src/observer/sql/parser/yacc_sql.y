@@ -22,6 +22,7 @@ typedef struct ParserContext {
   Condition conditions[MAX_NUM];
   CompOp comp;
 	char id[MAX_NUM];
+  FuncName func;
 } ParserContext;
 
 //获取子串
@@ -111,6 +112,11 @@ ParserContext *get_context(yyscan_t scanner)
         NOT //NOT LIKE
         INNER
         JOIN
+        AGGMAX
+	AGGMIN
+	AGGCOUNT
+	AGGAVG
+	AGGSUM
 
 %union {
   struct _Attr *attr;
@@ -412,7 +418,7 @@ select_attr:
 			relation_attr_init(&attr, NULL, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-	| STAR attr_list {
+    | STAR attr_list {
     			RelAttr attr;
     			relation_attr_init(&attr, NULL, "*");
     			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
@@ -422,11 +428,12 @@ select_attr:
 			relation_attr_init(&attr, NULL, $1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-  	| ID DOT ID attr_list {
+    | ID DOT ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, $1, $3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
+    | func LBRACE expression RBRACE attr_list { }
     ;
 attr_list:
     /* empty */
@@ -445,6 +452,44 @@ attr_list:
         // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=$2;
   	  }
   	;
+    | COMMA func LBRACE expression RBRACE attr_list {}
+
+expression:
+    STAR {// *
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, "*");
+		Aggregation aggr;
+		aggr.attribute = attr;
+		aggr.func_name = CONTEXT->func;
+		aggr.is_value = 0;
+		selects_append_aggregation(&CONTEXT->ssql->sstr.selection,&aggr);
+	}
+    | ID{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		Aggregation aggr;
+		aggr.attribute = attr;
+		aggr.func_name = CONTEXT->func;
+		aggr.is_value = 0;
+		selects_append_aggregation(&CONTEXT->ssql->sstr.selection,&aggr);
+        }
+    | ID DOT ID{
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		Aggregation aggr;
+		aggr.attribute = attr;
+		aggr.func_name = CONTEXT->func;
+		aggr.is_value = 0;
+		selects_append_aggregation(&CONTEXT->ssql->sstr.selection,&aggr);
+	}
+    | value{
+		Aggregation aggr;
+		aggr.func_name = CONTEXT->func;
+		aggr.is_value = 1;
+		aggr.value = CONTEXT->values[CONTEXT->value_length - 1];
+		//CONTEXT->value_length = 0;
+		selects_append_aggregation(&CONTEXT->ssql->sstr.selection,&aggr);
+	}
 
 inner_join_list:
     /* empty */
@@ -627,6 +672,14 @@ comOp:
     | NE { CONTEXT->comp = NOT_EQUAL; }
     | NOT LIKE { CONTEXT->comp = STRING_NOT_LIKE; }
     | LIKE { CONTEXT->comp = STRING_LIKE; }
+    ;
+
+func:
+  	AGGMAX { CONTEXT->func = AGG_MAX; }
+    | AGGMIN { CONTEXT->func = AGG_MIN; }
+    | AGGCOUNT { CONTEXT->func = AGG_COUNT; }
+    | AGGAVG { CONTEXT->func = AGG_AVG; }
+    | AGGSUM { CONTEXT->func = AGG_SUM; }
     ;
 
 load_data:

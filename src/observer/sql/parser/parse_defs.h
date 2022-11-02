@@ -52,6 +52,14 @@ typedef enum
   TEXTS
 } AttrType;
 
+typedef enum {
+  AGG_MAX,    // max 0
+  AGG_MIN,    // min 1
+  AGG_COUNT,  // count 2
+  AGG_AVG,    // avg 3
+  AGG_SUM     // sum 4
+} FuncName;
+
 //属性值
 typedef struct _Value {
   AttrType type;  // type of value
@@ -70,6 +78,13 @@ typedef struct _Condition {
   Value right_value;   // right-hand side value if right_is_attr = FALSE
 } Condition;
 
+typedef struct {
+  FuncName func_name;
+  RelAttr attribute;
+  int is_value;
+  Value value;
+} Aggregation;
+
 // struct of select
 typedef struct {
   size_t attr_num;                // Length of attrs in Select clause
@@ -80,6 +95,8 @@ typedef struct {
   char *join_relations[MAX_NUM];
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
+  size_t aggregation_num;
+  Aggregation aggregations[MAX_NUM];
 } Selects;
 
 // struct of insert tuple
@@ -219,11 +236,14 @@ void condition_destroy(Condition *condition);
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length);
 void attr_info_destroy(AttrInfo *attr_info);
 
+void aggregation_destroy(Aggregation *aggregation);
+
 void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_join(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
+void selects_append_aggregation(Selects *selects, Aggregation *aggregation);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, InsertTuple tuples[], size_t tuple_num);
