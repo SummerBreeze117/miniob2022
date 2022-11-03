@@ -1003,20 +1003,6 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
   int attr_num = create_index.attr_num;
   std::vector<std::string> index_set;
   for (int i = attr_num - 1; i >= 0; i --) {
-    if (create_index.unique) {
-      bool isDuplicating = false;
-      for (std::string &index_set_name : table->index_set_names()) {
-        for (std::string &index_name : table->index_sets()[index_set_name]) {
-          if (strcmp(table->table_meta().index(index_name.c_str())->field(), create_index.attributes[i].attribute_name) == 0) {
-            isDuplicating = true;
-          }
-        }
-      }
-      if (isDuplicating) {
-        rc = RC::SCHEMA_INDEX_EXIST;
-        break;
-      }
-    }
     std::string index_name(create_index.index_name);
     index_name += "_" + std::string(create_index.attributes[i].attribute_name);
     rc = table->create_index(nullptr, index_name.c_str(), create_index.attributes[i].attribute_name);
