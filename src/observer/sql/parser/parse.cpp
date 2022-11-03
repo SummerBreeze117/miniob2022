@@ -305,10 +305,11 @@ void create_indexs_append_attribute(CreateIndex *create_index, RelAttr *rel_attr
 }
 
 void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name)
+    CreateIndex *create_index, const char *index_name, const char *relation_name, int unique)
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
+  create_index->unique = unique;
 }
 
 void create_index_destroy(CreateIndex *create_index)

@@ -1003,11 +1003,28 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
   int attr_num = create_index.attr_num;
   std::vector<std::string> index_set;
   for (int i = attr_num - 1; i >= 0; i --) {
+    if (create_index.unique) {
+      bool isDuplicating = false;
+      for (std::string &index_set_name : table->index_set_names()) {
+        for (std::string &index_name : table->index_sets()[index_set_name]) {
+          if (strcmp(table->table_meta().index(index_name.c_str())->field(), create_index.attributes[i].attribute_name) == 0) {
+            isDuplicating = true;
+          }
+        }
+      }
+      if (isDuplicating) {
+        rc = RC::SCHEMA_INDEX_EXIST;
+        break;
+      }
+    }
     std::string index_name(create_index.index_name);
     index_name += "_" + std::string(create_index.attributes[i].attribute_name);
     rc = table->create_index(nullptr, index_name.c_str(), create_index.attributes[i].attribute_name);
     if (rc == RC::SUCCESS) {
       index_set.push_back(index_name);
+      if (create_index.unique) {
+        table->unique_index_set().insert(create_index.attributes[i].attribute_name);
+      }
     } else break;
   }
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
@@ -1045,12 +1062,12 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
     const TableMeta &tableMeta = table->table_meta();
     auto &index_set_names = table->index_set_names();
     auto &index_sets_ = table->index_sets();
+    auto &unique_set = table->unique_index_set();
     ss << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
-    int non_unique = index_sets_.size() != 1 ? 1 : 0;
     for (std::string &index_set_name : index_set_names) {
       if (index_sets_[index_set_name].size() == 1) {
         ss << tableMeta.name() << " | ";
-        ss << 1 << " | ";
+        ss << (unique_set.count(tableMeta.index(index_sets_[index_set_name][0].c_str())->field()) ? 0 : 1) << " | ";
         ss << index_set_name << " | ";
         ss << 1 << " | ";
         ss << tableMeta.index(index_sets_[index_set_name][0].c_str())->field() << "\n";
@@ -1059,11 +1076,9 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
         int seq = 1;
         for (std::string &index_name : index_sets_[index_set_name]) {
           ss << tableMeta.name() << " | ";
-          ss << 1 << " | ";
+          ss << (unique_set.count(tableMeta.index(index_name.c_str())->field()) ? 0 : 1) << " | ";
           ss << index_set_name << " | ";
           ss << seq ++ << " | ";
-          std::string search_name(index_set_name.c_str());
-          search_name += "_" + index_name;
           ss << tableMeta.index(index_name.c_str())->field() << "\n";
         }
       }

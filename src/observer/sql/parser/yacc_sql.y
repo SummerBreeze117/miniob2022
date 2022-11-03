@@ -117,6 +117,7 @@ ParserContext *get_context(yyscan_t scanner)
 	AGGCOUNT
 	AGGAVG
 	AGGSUM
+	UNIQUE
 
 %union {
   struct _Attr *attr;
@@ -239,8 +240,18 @@ create_index:		/*create index 语句的语法解析树*/
 			relation_attr_init(&attr, NULL, $7);
 			create_indexs_append_attribute(&CONTEXT->ssql->sstr.create_index, &attr);
 
-			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5);
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5, 0);
 		}
+    | CREATE UNIQUE INDEX ID ON ID LBRACE ID attrname_list RBRACE SEMICOLON
+    {
+	CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
+
+	RelAttr attr;
+	relation_attr_init(&attr, NULL, $8);
+	create_indexs_append_attribute(&CONTEXT->ssql->sstr.create_index, &attr);
+
+	create_index_init(&CONTEXT->ssql->sstr.create_index, $4, $6, 1);
+    }
     ;
 
 attrname_list:

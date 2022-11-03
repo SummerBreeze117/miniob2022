@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #define __OBSERVER_STORAGE_COMMON_TABLE_H__
 
 #include <unordered_map>
+#include <unordered_set>
 #include "storage/common/table_meta.h"
 
 struct RID;
@@ -123,6 +124,7 @@ public:
   Index *find_index_by_field(const char *field_name) const;
   std::unordered_map<std::string, std::vector<std::string>>& index_sets() { return index_sets_;}
   std::vector<std::string>& index_set_names() { return index_set_names_; }
+  std::unordered_set<std::string>& unique_index_set() { return unique_index_set_; }
 private:
   std::string base_dir_;
   CLogManager *clog_manager_;
@@ -132,6 +134,7 @@ private:
   std::vector<Index *> indexes_;
   std::vector<std::string> index_set_names_;
   std::unordered_map<std::string, std::vector<std::string>> index_sets_;
+  std::unordered_set<std::string> unique_index_set_;
 };
 
 #endif  // __OBSERVER_STORAGE_COMMON_TABLE_H__
