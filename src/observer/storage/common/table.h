@@ -125,6 +125,7 @@ public:
   std::unordered_map<std::string, std::vector<std::string>>& index_sets() { return index_sets_;}
   std::vector<std::string>& index_set_names() { return index_set_names_; }
   std::unordered_set<std::string>& unique_index_set() { return unique_index_set_; }
+  std::vector<std::string>& unique_index_set_names() { return unique_index_set_names_; }
 private:
   std::string base_dir_;
   CLogManager *clog_manager_;
@@ -133,8 +134,10 @@ private:
   RecordFileHandler *record_handler_ = nullptr;  /// 记录操作
   std::vector<Index *> indexes_;
   std::vector<std::string> index_set_names_;
+  std::vector<std::string> unique_index_set_names_;
   std::unordered_map<std::string, std::vector<std::string>> index_sets_;
   std::unordered_set<std::string> unique_index_set_;
+  std::unordered_map<std::string, std::unordered_set<int>> masks_;
 };
 
 #endif  // __OBSERVER_STORAGE_COMMON_TABLE_H__

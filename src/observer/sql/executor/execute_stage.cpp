@@ -1027,9 +1027,16 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
       }
     } else break;
   }
-  sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
-  table->index_set_names().push_back(create_index.index_name);
-  table->index_sets()[create_index.index_name] = std::move(index_set);
+  if (rc == RC::SUCCESS) {
+    table->index_set_names().emplace_back(create_index.index_name);
+    if (create_index.unique) {
+      table->unique_index_set_names().emplace_back(create_index.index_name);
+    }
+    table->index_sets()[create_index.index_name] = std::move(index_set);
+    sql_event->session_event()->set_response("SUCCESS\n");
+  } else {
+    sql_event->session_event()->set_response("FAILURE\n");
+  }
   return rc;
 }
 

@@ -378,6 +378,21 @@ RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
     return RC::INVALID_ARGUMENT;
   }
 
+  for (const auto& name : unique_index_set_names_) {
+    std::vector<std::string>& index_set = index_sets_[name];
+    std::vector<int> idxs;
+    for (const auto& field_name : index_set) {
+      idxs.push_back(table_meta_.field(table_meta_.index(field_name.c_str())->field())->offset() / 4 - 1);
+    }
+    int mask = 0;
+    for (int i : idxs) {
+      mask += pow(10, i) * (*(int*)values[i].data);
+    }
+    if (masks_[name].count(mask)) {
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+  }
+
   char *record_data;
   rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
@@ -392,6 +407,18 @@ RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to insert a record. rc=%d:%s", rc, strrc(rc));
     return rc;
+  }
+  for (const auto& name : unique_index_set_names_) {
+    std::vector<std::string>& index_set = index_sets_[name];
+    std::vector<int> idxs;
+    for (const auto& field_name : index_set) {
+      idxs.push_back(table_meta_.field(table_meta_.index(field_name.c_str())->field())->offset() / 4 - 1);
+    }
+    int mask = 0;
+    for (int i : idxs) {
+      mask += pow(10, i) * (*(int*)values[i].data);
+    }
+    masks_[name].insert(mask);
   }
   return rc;
 }
