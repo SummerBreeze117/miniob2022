@@ -655,11 +655,11 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
     return RC::INVALID_ARGUMENT;
   }
-  if (unique_index_set_.count(attribute_name)) {
-    LOG_INFO("Invalid input arguments, table name is %s, attribute %s exist index",
-             name(), index_name, attribute_name);
-    return RC::SCHEMA_INDEX_EXIST;
-  }
+//  if (unique_index_set_.count(attribute_name)) {
+//    LOG_INFO("Invalid input arguments, table name is %s, attribute %s exist index",
+//             name(), index_name, attribute_name);
+//    return RC::SCHEMA_INDEX_EXIST;
+//  }
 
   const FieldMeta *field_meta = table_meta_.field(attribute_name);
   if (!field_meta) {

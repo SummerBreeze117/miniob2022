@@ -1003,6 +1003,21 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
   int attr_num = create_index.attr_num;
   std::vector<std::string> index_set;
   for (int i = attr_num - 1; i >= 0; i --) {
+    for (const std::string& name : table->unique_index_set_names()) {
+      std::vector<std::string>& index_set = table->index_sets()[name];
+      std::unordered_set<std::string> s1(index_set.begin(), index_set.end()), s2;
+      for (int i = 0; i < create_index.attr_num; i ++) {
+        s2.insert(create_index.attributes[i].attribute_name);
+      }
+      if (s1 == s2) {
+        rc = RC::RECORD_DUPLICATE_KEY;
+        break;
+      }
+    }
+    if (rc != RC::SUCCESS) {
+      break;
+    }
+
     std::string index_name(create_index.index_name);
     index_name += "_" + std::string(create_index.attributes[i].attribute_name);
     rc = table->create_index(nullptr, index_name.c_str(), create_index.attributes[i].attribute_name);
