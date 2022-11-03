@@ -1033,6 +1033,7 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
       table->unique_index_set_names().emplace_back(create_index.index_name);
     }
     table->index_sets()[create_index.index_name] = std::move(index_set);
+    table->index_insert_forUnique(create_index.index_name);
     sql_event->session_event()->set_response("SUCCESS\n");
   } else {
     sql_event->session_event()->set_response("FAILURE\n");

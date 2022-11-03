@@ -73,6 +73,7 @@ public:
       void (*record_reader)(const char *data, void *context));
 
   RC create_index(Trx *trx, const char *index_name, const char *attribute_name);
+  RC index_insert_forUnique(const std::string &name);
 
   RC get_record_scanner(RecordFileScanner &scanner);
 
@@ -126,6 +127,7 @@ public:
   std::vector<std::string>& index_set_names() { return index_set_names_; }
   std::unordered_set<std::string>& unique_index_set() { return unique_index_set_; }
   std::vector<std::string>& unique_index_set_names() { return unique_index_set_names_; }
+  std::unordered_map<std::string, std::unordered_set<int>>& masks() { return masks_; }
 private:
   std::string base_dir_;
   CLogManager *clog_manager_;

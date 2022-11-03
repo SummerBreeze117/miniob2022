@@ -386,7 +386,7 @@ RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
     }
     int mask = 0;
     for (int i : idxs) {
-      mask += pow(10, i) * (*(int*)values[i].data);
+      mask = mask * 117 + (*(int*)values[i].data);
     }
     if (masks_[name].count(mask)) {
       return RC::RECORD_DUPLICATE_KEY;
@@ -416,7 +416,7 @@ RC Table::insert_one_record(Trx *trx, int value_num, const Value *values)
     }
     int mask = 0;
     for (int i : idxs) {
-      mask += pow(10, i) * (*(int*)values[i].data);
+      mask = mask * 117 + (*(int*)values[i].data);
     }
     masks_[name].insert(mask);
   }
@@ -735,6 +735,40 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name());
 
+  return rc;
+}
+
+RC Table::index_insert_forUnique(const std::string& name)
+{
+  RecordFileScanner scanner;
+  RC rc = scanner.open_scan(*data_buffer_pool_, nullptr);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to open scanner. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  int record_count = 0;
+  Record record;
+  while (scanner.has_next()) {
+    rc = scanner.next(record);
+    std::vector<std::string>& index_set = index_sets_[name];
+    std::vector<int> idxs;
+    for (const auto& field_name : index_set) {
+      idxs.push_back(table_meta_.field(table_meta_.index(field_name.c_str())->field())->offset() / 4 - 1);
+    }
+    int mask = 0;
+    int *data_ptr = (int*)(record.data() + 4);
+    for (int i : idxs) {
+      mask = mask * 117 + data_ptr[i];
+    }
+    masks_[name].insert(mask);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch next record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+  }
+
+  scanner.close_scan();
   return rc;
 }
 
