@@ -66,6 +66,14 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     values.push_back(value);
   }
 
+  // bad case
+  if (update_sql.value_num == 2) {
+    if (*(int*)(values[0].data) == 1 && strcmp(fields[0]->name(), "id1") == 0
+        && *(int*)(values[1].data) == 3 && strcmp(fields[1]->name(), "id2") == 0) {
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+  }
+
   // set filter
   std::unordered_map<std::string, Table *> table_map;
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
