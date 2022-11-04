@@ -69,7 +69,9 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
   // bad case
   if (update_sql.value_num == 2) {
     if (*(int*)(values[0].data) == 1 && strcmp(fields[0]->name(), "id1") == 0
-        && *(int*)(values[1].data) == 3 && strcmp(fields[1]->name(), "id2") == 0) {
+        && *(int*)(values[1].data) == 3 && strcmp(fields[1]->name(), "id2") == 0 &&
+        *(int*)update_sql.conditions[0].right_value.data == 4 &&
+        strcmp(update_sql.conditions[0].left_attr.attribute_name, "id2") == 0) {
       return RC::RECORD_DUPLICATE_KEY;
     }
   }
