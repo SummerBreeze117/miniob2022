@@ -34,7 +34,9 @@ public:
 
 public:
   Table *table() const { return table_; }
-  std::vector<Value>& values()  { return values_; }
+  std::vector<UpdateValue>& updateValues()  { return updateValues_; }
+  std::vector<Value>& values() { return values_; }
+  void setValues(std::vector<Value> values) { values.swap(values_); }
   std::vector<const FieldMeta *>& fields()  { return fields_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 
@@ -42,6 +44,7 @@ private:
   Table *table_ = nullptr;
   std::vector<const FieldMeta *> fields_;
   std::vector<Value> values_;
+  std::vector<UpdateValue> updateValues_;
   FilterStmt *filter_stmt_ = nullptr;
 };
 

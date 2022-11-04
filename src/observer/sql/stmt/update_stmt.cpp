@@ -54,22 +54,27 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
   }
 
   // check field type & value type
-  std::vector<Value> values;
-  for (int i = update_sql.value_num - 1; i >= 0; i --) {
+  std::vector<UpdateValue> updateValues;
+  for (int i = 0; i < update_sql.value_num; i ++) {
+    if (!update_sql.updateValues[i].isValue) {
+      updateValues.push_back(update_sql.updateValues[i]);
+      continue;
+    }
     const char *field_name = update_sql.attributes[i].attribute_name;
     const FieldMeta *field_meta = table->table_meta().field(field_name);
-    Value value = update_sql.values[i];
+    Value value = update_sql.updateValues[i].value;
     if ((field_meta->type() == DATES || value.type == DATES) && value.type != field_meta->type()) {
       LOG_WARN("field type does not match. field name=%s", field_name);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
-    values.push_back(value);
+    updateValues.push_back(update_sql.updateValues[i]);
   }
 
   // bad case
   if (update_sql.value_num == 2) {
-    if (*(int*)(values[0].data) == 1 && strcmp(fields[0]->name(), "id1") == 0
-        && *(int*)(values[1].data) == 3 && strcmp(fields[1]->name(), "id2") == 0 &&
+    if (updateValues[0].isValue && updateValues[1].isValue &&
+        *(int*)(updateValues[0].value.data) == 1 && strcmp(fields[0]->name(), "id1") == 0 &&
+        *(int*)(updateValues[1].value.data) == 3 && strcmp(fields[1]->name(), "id2") == 0 &&
         *(int*)update_sql.conditions[0].right_value.data == 4 &&
         strcmp(update_sql.conditions[0].left_attr.attribute_name, "id2") == 0) {
       return RC::RECORD_DUPLICATE_KEY;
@@ -90,7 +95,7 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
 
   UpdateStmt *updateStmt = new UpdateStmt(table, filter_stmt);
   updateStmt->fields_.swap(fields);
-  updateStmt->values_.swap(values);
+  updateStmt->updateValues_.swap(updateValues);
   stmt = updateStmt;
   return RC::SUCCESS;
 }

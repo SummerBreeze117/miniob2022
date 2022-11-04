@@ -255,9 +255,14 @@ void updates_append_attribute(Updates *updates, RelAttr *rel_attr)
   updates->attributes[updates->attr_num++] = *rel_attr;
 }
 
-void updates_append_value(Updates *updates, Value *value)
+void updates_append_value(Updates *updates, Value *value, Selects *selects, int isValue)
 {
-  updates->values[updates->value_num++] = *value;
+  updates->updateValues[updates->value_num].isValue = isValue;
+  if (isValue) {
+    updates->updateValues[updates->value_num++].value = *value;
+  } else {
+    updates->updateValues[updates->value_num++].select_sql = *selects;
+  }
 }
 
 void updates_destroy(Updates *updates)
@@ -271,7 +276,12 @@ void updates_destroy(Updates *updates)
   updates->attr_num = 0;
 
   for (size_t i = 0; i < updates->value_num; i ++) {
-    value_destroy(&updates->values[i]);
+    if (updates->updateValues[i].isValue) {
+      value_destroy(&updates->updateValues[i].value);
+    }
+    else {
+      selects_destroy(&updates->updateValues[i].select_sql);
+    }
   }
   updates->value_num = 0;
 

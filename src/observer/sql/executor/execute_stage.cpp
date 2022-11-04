@@ -908,6 +908,35 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   Trx *trx = session->current_trx();
   CLogManager *clog_manager = db->get_clog_manager();
 
+  std::vector<UpdateValue>& updateValues = updateStmt->updateValues();
+  std::vector<Value> values(updateValues.size());
+  for (int i = 0; i < updateValues.size(); i ++) {
+    if (updateValues[i].isValue) {
+      values[i] = updateValues[i].value;
+    } else {
+      Stmt *stmt;
+      rc = SelectStmt::create(db, updateValues[i].select_sql, stmt);
+      if (rc != RC::SUCCESS) {
+        session_event->set_response("FAILURE\n");
+        return rc;
+      }
+      Value value{};
+
+      rc = select_for_update(dynamic_cast<SelectStmt*>(stmt), &value);
+      if (rc != RC::SUCCESS) {
+        session_event->set_response("FAILURE\n");
+        return rc;
+      }
+      AttrType attrType = updateStmt->fields()[i]->type();
+      if (attrType != value.type) {
+        updateStmt->table()->cast_type(attrType, value, 4);
+      }
+      value.type = attrType;
+      values[i] = value;
+    }
+  }
+  updateStmt->setValues(values);
+
   Operator *scan_oper = try_to_create_index_scan_operator(updateStmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(updateStmt->table());
@@ -942,6 +971,107 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
       session_event->set_response("SUCCESS\n");
     }
   }
+  return rc;
+}
+
+RC ExecuteStage::select_for_update(SelectStmt *select_stmt, Value *value)
+{
+  RC rc = RC::SUCCESS;
+
+  std::vector<TupleSet> sel_res;
+  std::map<std::pair<const Table*, const FieldMeta*>, int> field_to_idx;
+  int idx = 0;
+  for (int i = 0; i < select_stmt->tables().size(); i ++) {
+    Table *table = select_stmt->tables()[i];
+    Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+    if (nullptr == scan_oper) {
+      scan_oper = new TableScanOperator(table);
+    }
+    DEFER([&] () {delete scan_oper;});
+
+    PredicateOperator pred_oper(select_stmt->filter_stmt());
+    pred_oper.add_child(scan_oper);
+    ProjectOperator project_oper;
+    project_oper.add_child(&pred_oper);
+    for (const Field &field : select_stmt->query_fields()) {
+      if (field.table() == table) {
+        project_oper.add_projection(field.table(), field.meta(), select_stmt->tables().size() == 1);
+        if (!field_to_idx.count({field.table(), field.meta()})) {
+          field_to_idx[{field.table(), field.meta()}] = idx ++;
+        }
+      }
+    }
+    rc = project_oper.open();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open operator");
+      return rc;
+    }
+    TupleSet tuples;
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      Tuple * tuple = project_oper.current_tuple();
+
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
+      TupleInfo tupleInfo;
+      for (int i = 0; i < tuple->cell_num(); i ++) {
+        TupleCell cell;
+        tuple->cell_at(i, cell);
+        tupleInfo.push_back(cell);
+      }
+      tuples.push_back(std::move(tupleInfo));
+    }
+
+    if (rc != RC::RECORD_EOF) {
+      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+      project_oper.close();
+    } else {
+      rc = project_oper.close();
+    }
+    sel_res.push_back(std::move(tuples));
+  }
+
+  TupleSet res;
+  if (select_stmt->is_inner_join() && select_stmt->tables().size() >= 3) {
+    res = getDescartes_with_innerjoin(sel_res, select_stmt->filter_stmt(), field_to_idx, select_stmt->tables());
+  }
+  else {
+    res = getDescartes(sel_res);
+  }
+
+  res = check_condition(res, select_stmt->filter_stmt(), field_to_idx);
+
+  if (res.size() != 1 && select_stmt->aggregations().size() == 0) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  std::stringstream ss;
+  if (select_stmt->aggregations().size()) { //聚合函数
+    RC rc = do_aggregation(ss, res, select_stmt->tables()[0], select_stmt->aggregations(), select_stmt->table_map(), field_to_idx);
+    if (rc != RC::SUCCESS) {
+      return RC::INVALID_ARGUMENT;
+    }
+  } else { //普通查询
+    if (select_stmt->tables().size() == 1) {
+      for (TupleInfo &tuple : res) {
+        tupleInfo_to_string(ss, tuple);
+      }
+    } else {
+      for (TupleInfo &tuple : res) {
+        tupleInfo_to_string_with_tables(ss, tuple, field_to_idx, select_stmt->query_fields_forprint());
+      }
+    }
+  }
+
+  std::string str;
+  ss >> str;
+  value->type = CHARS;
+  value->data = new char[str.size() + 1];
+  memcpy(value->data, str.c_str(), str.size() + 1);
+
   return rc;
 }
 

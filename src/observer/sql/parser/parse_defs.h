@@ -119,16 +119,23 @@ typedef struct {
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Deletes;
 
+typedef struct {
+  int isValue;
+  Value value;
+  Selects select_sql;
+} UpdateValue;
+
 // struct of update
 typedef struct {
   char *relation_name;            // Relation to update
   size_t attr_num;
   RelAttr attributes[MAX_NUM];
   size_t value_num;               // Length of values
-  Value values[MAX_NUM];          // Values to update
+  UpdateValue updateValues[MAX_NUM];
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Updates;
+
 
 typedef struct {
   char *name;     // Attribute name
@@ -258,7 +265,7 @@ void deletes_destroy(Deletes *deletes);
 
 void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num);
 void updates_append_attribute(Updates *updates, RelAttr *rel_attr);
-void updates_append_value(Updates *updates, Value *value);
+void updates_append_value(Updates *updates, Value *value, Selects *selects, int isValue);
 void updates_destroy(Updates *updates);
 
 void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info);
