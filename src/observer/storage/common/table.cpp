@@ -778,20 +778,24 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   return RC::GENERIC_ERROR;
 }
 
-RC Table::update_record(Trx *trx, Record *record, const FieldMeta *field, const Value value)
+RC Table::update_record(Trx *trx, Record *record, std::vector<const FieldMeta*> fields, std::vector<Value> values)
 {
   RC rc = RC::SUCCESS;
-  size_t copy_len = field->len();
-  if (field->type() != value.type) {
-    cast_type(field->type(), value, copy_len);
-  }
-  if (field->type() == CHARS || field->type() == TEXTS) {
-    const size_t data_len = strlen((const char *)value.data);
-    if (copy_len > data_len) {
-      copy_len = data_len + 1;
+  for (size_t i = 0; i < fields.size(); i ++) {
+    const FieldMeta *field = fields[i];
+    Value value = values[i];
+    size_t copy_len = field->len();
+    if (field->type() != value.type) {
+      cast_type(field->type(), value, copy_len);
     }
+    if (field->type() == CHARS || field->type() == TEXTS) {
+      const size_t data_len = strlen((const char *)value.data);
+      if (copy_len > data_len) {
+        copy_len = data_len + 1;
+      }
+    }
+    memcpy(record->data() + field->offset(), value.data, copy_len);
   }
-  memcpy(record->data() + field->offset(), value.data, copy_len);
   rc = record_handler_->update_record(record);
 
   if (trx != nullptr) {

@@ -395,15 +395,35 @@ delete:		/*  delete 语句的语法解析树*/
     }
     ;
 update:			/*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where SEMICOLON
+    UPDATE ID SET ID EQ value set_list where SEMICOLON
 		{
 			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
+
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $4);
+			updates_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+
 			Value *value = &CONTEXT->values[0];
-			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
+			updates_append_value(&CONTEXT->ssql->sstr.update, value);
+
+			updates_init(&CONTEXT->ssql->sstr.update, $2,
 					CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
+			CONTEXT->value_length = 0;
 		}
     ;
+set_list:
+   /* empty */
+   | COMMA ID EQ value set_list {
+	RelAttr attr;
+	relation_attr_init(&attr, NULL, $2);
+	updates_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+
+	Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
+	updates_append_value(&CONTEXT->ssql->sstr.update, value);
+   }
+
+
 select:				/*  select 语句的语法解析树*/
     SELECT select_attr FROM ID rel_list inner_join_list where SEMICOLON
 		{

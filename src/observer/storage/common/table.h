@@ -63,7 +63,7 @@ public:
   RC insert_one_record(Trx *trx, int value_num, const Value *values);
   RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
       const Condition conditions[], int *updated_count);
-  RC update_record(Trx *trx, Record *record, const FieldMeta* field, const Value value);
+  RC update_record(Trx *trx, Record *record, std::vector<const FieldMeta*> fields, std::vector<Value> values);
   RC recover_update_record(Record *record);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
   RC delete_record(Trx *trx, Record *record);

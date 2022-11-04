@@ -18,8 +18,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/db.h"
 #include "storage/common/table.h"
 
-UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field, Value value, FilterStmt *filter_stmt)
-  : table_ (table), field_(field), value_(value), filter_stmt_(filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, FilterStmt *filter_stmt)
+  : table_ (table), filter_stmt_(filter_stmt)
 {}
 
 RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
@@ -37,20 +37,33 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-
+  // check attr_num == value_num
+  if (update_sql.attr_num != update_sql.value_num) {
+    return RC::MISMATCH;
+  }
   // field
-  const char *field_name = update_sql.attribute_name;
-  const FieldMeta *field_meta = table->table_meta().field(field_name);
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
-    return RC::SCHEMA_FIELD_MISSING;
+  std::vector<const FieldMeta*> fields;
+  for (int i = update_sql.attr_num - 1; i >= 0; i --) {
+    const char *field_name = update_sql.attributes[i].attribute_name;
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    fields.push_back(field_meta);
   }
 
   // check field type & value type
-  Value value = update_sql.value;
-  if ((field_meta->type() == DATES || value.type == DATES) && value.type != field_meta->type()) {
-    LOG_WARN("field type does not match. field name=%s", field_name);
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  std::vector<Value> values;
+  for (int i = update_sql.value_num - 1; i >= 0; i --) {
+    const char *field_name = update_sql.attributes[i].attribute_name;
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    Value value = update_sql.values[i];
+    if ((field_meta->type() == DATES || value.type == DATES) && value.type != field_meta->type()) {
+      LOG_WARN("field type does not match. field name=%s", field_name);
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+    values.push_back(value);
   }
 
   // set filter
@@ -65,6 +78,9 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     return rc;
   }
 
-  stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+  UpdateStmt *updateStmt = new UpdateStmt(table, filter_stmt);
+  updateStmt->fields_.swap(fields);
+  updateStmt->values_.swap(values);
+  stmt = updateStmt;
   return RC::SUCCESS;
 }

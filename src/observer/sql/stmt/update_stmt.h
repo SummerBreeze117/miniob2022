@@ -26,7 +26,7 @@ class UpdateStmt : public Stmt
 public:
 
   UpdateStmt() = default;
-  UpdateStmt(Table *table, const FieldMeta *field, Value value, FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, FilterStmt *filter_stmt);
   StmtType type() const override { return StmtType::UPDATE; }
 
 public:
@@ -34,14 +34,14 @@ public:
 
 public:
   Table *table() const { return table_; }
-  Value value() const { return value_; }
-  const FieldMeta *field() const { return field_; }
+  std::vector<Value>& values()  { return values_; }
+  std::vector<const FieldMeta *>& fields()  { return fields_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 
 private:
   Table *table_ = nullptr;
-  const FieldMeta *field_ = nullptr;
-  const Value value_{};
+  std::vector<const FieldMeta *> fields_;
+  std::vector<Value> values_;
   FilterStmt *filter_stmt_ = nullptr;
 };
 
