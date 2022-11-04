@@ -796,7 +796,36 @@ RC Table::update_record(Trx *trx, Record *record, std::vector<const FieldMeta*> 
     }
     memcpy(record->data() + field->offset(), value.data, copy_len);
   }
+
+  for (const auto& name : unique_index_set_names_) {
+    std::vector<std::string>& index_set = index_sets_[name];
+    std::vector<int> idxs;
+    for (const auto& field_name : index_set) {
+      idxs.push_back(table_meta_.field(table_meta_.index(field_name.c_str())->field())->offset() / 4 - 1);
+    }
+    int mask = 0;
+    for (int i : idxs) {
+      mask = mask * 117 + (*(int*)values[i].data);
+    }
+    if (masks_[name].count(mask)) {
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+  }
+
   rc = record_handler_->update_record(record);
+
+  for (const auto& name : unique_index_set_names_) {
+    std::vector<std::string>& index_set = index_sets_[name];
+    std::vector<int> idxs;
+    for (const auto& field_name : index_set) {
+      idxs.push_back(table_meta_.field(table_meta_.index(field_name.c_str())->field())->offset() / 4 - 1);
+    }
+    int mask = 0;
+    for (int i : idxs) {
+      mask = mask * 117 + (*(int*)values[i].data);
+    }
+    masks_[name].insert(mask);
+  }
 
   if (trx != nullptr) {
     rc = trx->update_record(this, record);
