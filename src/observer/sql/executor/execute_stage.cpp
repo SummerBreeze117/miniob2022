@@ -1072,11 +1072,12 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
     auto &index_set_names = table->index_set_names();
     auto &index_sets_ = table->index_sets();
     auto &unique_set = table->unique_index_set();
+    std::unordered_set<std::string> s(table->unique_index_set_names().begin(), table->unique_index_set_names().end());
     ss << "Table | Non_unique | Key_name | Seq_in_index | Column_name\n";
     for (std::string &index_set_name : index_set_names) {
       if (index_sets_[index_set_name].size() == 1) {
         ss << tableMeta.name() << " | ";
-        ss << (unique_set.count(tableMeta.index(index_sets_[index_set_name][0].c_str())->field()) ? 0 : 1) << " | ";
+        ss << (s.count(index_set_name) ? 0 : 1) << " | ";
         ss << index_set_name << " | ";
         ss << 1 << " | ";
         ss << tableMeta.index(index_sets_[index_set_name][0].c_str())->field() << "\n";
@@ -1085,7 +1086,7 @@ RC ExecuteStage::do_show_index(SQLStageEvent *sql_event)
         int seq = 1;
         for (std::string &index_name : index_sets_[index_set_name]) {
           ss << tableMeta.name() << " | ";
-          ss << (unique_set.count(tableMeta.index(index_name.c_str())->field()) ? 0 : 1) << " | ";
+          ss << (s.count(index_set_name) ? 0 : 1) << " | ";
           ss << index_set_name << " | ";
           ss << seq ++ << " | ";
           ss << tableMeta.index(index_name.c_str())->field() << "\n";
