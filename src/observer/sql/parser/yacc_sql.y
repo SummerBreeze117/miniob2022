@@ -115,6 +115,7 @@ ParserContext *get_context(yyscan_t scanner)
         NOT //NOT LIKE
         INNER
         JOIN
+        NULLABLE
         AGGMAX
 	AGGMIN
 	AGGCOUNT
@@ -292,7 +293,7 @@ attr_def_list:
     ;
     
 attr_def:
-    ID_get type LBRACE number RBRACE 
+    ID_get type LBRACE number RBRACE null
 		{
 			AttrInfo attribute;
 			attr_info_init(&attribute, CONTEXT->id, $2, $4);
@@ -303,7 +304,7 @@ attr_def:
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
 			CONTEXT->value_length++;
 		}
-    |ID_get type
+    |ID_get type null
 		{
 			AttrInfo attribute;
 			attr_info_init(&attribute, CONTEXT->id, $2, 4);
@@ -315,6 +316,12 @@ attr_def:
 			CONTEXT->value_length++;
 		}
     ;
+null:
+    | NULLABLE{
+
+    }
+    ;
+
 number:
 		NUMBER {$$ = $1;}
 		;
