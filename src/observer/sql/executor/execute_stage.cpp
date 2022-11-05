@@ -394,7 +394,9 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
     return false; // bad case
   }
-
+  if (strcmp(left_cell.data(), "null") == 0 || strcmp(right_cell.data(), "null") == 0) {
+    return false;
+  }
   const int compare = left_cell.compare(right_cell);
   bool filter_result = false;
   switch (comp) {

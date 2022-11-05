@@ -321,6 +321,9 @@ RC Table::insert_record(Trx *trx, Record *record)
 void Table::cast_type(AttrType type, Value value, size_t len)
                                                   /*len = 4*/
 {
+  if (strcmp((const char *)(value.data), "null") == 0) {
+    return;
+  }
   switch (type) {
     case CHARS: {
       std::string cast_str;

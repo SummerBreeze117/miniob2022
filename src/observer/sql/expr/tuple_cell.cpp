@@ -22,6 +22,10 @@ See the Mulan PSL v2 for more details. */
 
 void TupleCell::to_string(std::ostream &os) const
 {
+  if (strncmp(data_, "null", 4) == 0) {
+    os << "null";
+    return ;
+  }
   switch (attr_type_) {
   case INTS: {
     os << *(int *)data_;

@@ -125,6 +125,7 @@ ParserContext *get_context(yyscan_t scanner)
 	ORDER
 	BY
 	ASC
+	NULL_V
 
 %union {
   struct _Attr *attr;
@@ -395,6 +396,9 @@ value:
 			$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
+    |NULL_V {
+    	value_init_string(&CONTEXT->values[CONTEXT->value_length++], "null");
+    }
     ;
     
 delete:		/*  delete 语句的语法解析树*/
