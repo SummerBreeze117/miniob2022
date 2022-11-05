@@ -343,6 +343,12 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
 
 using TupleInfo = std::vector<TupleCell>;
 using TupleSet = std::vector<TupleInfo>;
+struct{
+  TupleInfo tuple;
+  bool operator< (const TupleInfo& other_tuple) const {
+
+  }
+} Tuple__;
 
 void tupleInfo_to_string(std::ostream &os, const TupleInfo& line)
 {
@@ -394,13 +400,13 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
     return false; // bad case
   }
-  if (strncmp(left_cell.data(), "null", 4) == 0 || strncmp(right_cell.data(), "null", 4) == 0) {
-    return false;
-  }
   const int compare = left_cell.compare(right_cell);
   bool filter_result = false;
   switch (comp) {
     case EQUAL_TO: {
+      if (strncmp(left_cell.data(), "null", 4) == 0 && strncmp(right_cell.data(), "null", 4) == 0) {
+        return true;
+      }
       filter_result = (0 == compare);
     } break;
     case LESS_EQUAL: {
@@ -410,12 +416,30 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
       filter_result = (compare != 0);
     } break;
     case LESS_THAN: {
+      if (strncmp(left_cell.data(), "null", 4) == 0 && strncmp(right_cell.data(), "null", 4) == 0) {
+        return false;
+      }
+      if (strncmp(left_cell.data(), "null", 4) == 0) {
+        return true;
+      }
+      if (strncmp(right_cell.data(), "null", 4) == 0) {
+        return false;
+      }
       filter_result = (compare < 0);
     } break;
     case GREAT_EQUAL: {
       filter_result = (compare >= 0);
     } break;
     case GREAT_THAN: {
+      if (strncmp(left_cell.data(), "null", 4) == 0 && strncmp(right_cell.data(), "null", 4) == 0) {
+        return false;
+      }
+      if (strncmp(right_cell.data(), "null", 4) == 0) {
+        return true;
+      }
+      if (strncmp(left_cell.data(), "null", 4) == 0) {
+        return false;
+      }
       filter_result = (compare > 0);
     } break;
     case STRING_LIKE: { //case like/not like
@@ -876,26 +900,47 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   res = check_condition(res, select_stmt->filter_stmt(), field_to_idx);
 
-  for (OrderBy &orderBy : select_stmt->orderbys()) {
-    Table *table = nullptr;
-    if (orderBy.order_by_attr.relation_name != nullptr &&
-        !common::is_blank(orderBy.order_by_attr.relation_name)) {
-      table = select_stmt->table_map()[orderBy.order_by_attr.relation_name];
-    } else {
-      table = select_stmt->tables()[0];
-    }
-    const FieldMeta *field = table->table_meta().field(orderBy.order_by_attr.attribute_name);
-    int idx = field_to_idx[{table, field}];
-    bool isAsc = orderBy.asc;
+  if (select_stmt->orderbys().size()) {
+    std::reverse(select_stmt->orderbys().begin(), select_stmt->orderbys().end());
     std::sort(res.begin(), res.end(), [&](TupleInfo &tuple1, TupleInfo &tuple2) {
-      if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
-        return true;
+      for (int i = 0; i < select_stmt->orderbys().size() - 1; i ++) {
+        OrderBy &orderBy = select_stmt->orderbys()[i];
+        Table *table = nullptr;
+        if (orderBy.order_by_attr.relation_name != nullptr &&
+            !common::is_blank(orderBy.order_by_attr.relation_name)) {
+          table = select_stmt->table_map()[orderBy.order_by_attr.relation_name];
+        } else {
+          table = select_stmt->tables()[0];
+        }
+        const FieldMeta *field = table->table_meta().field(orderBy.order_by_attr.attribute_name);
+        int idx = field_to_idx[{table, field}];
+        bool isAsc = orderBy.asc;
+        if (cell_check(tuple1[idx], CompOp::NOT_EQUAL, tuple2[idx])) {
+          if (isAsc) {
+            return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
+          } else {
+            return cell_check(tuple1[idx], CompOp::GREAT_THAN, tuple2[idx]);
+          }
+        }
       }
-      return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
+
+      OrderBy &orderBy = select_stmt->orderbys().back();
+      Table *table = nullptr;
+      if (orderBy.order_by_attr.relation_name != nullptr &&
+          !common::is_blank(orderBy.order_by_attr.relation_name)) {
+        table = select_stmt->table_map()[orderBy.order_by_attr.relation_name];
+      } else {
+        table = select_stmt->tables()[0];
+      }
+      const FieldMeta *field = table->table_meta().field(orderBy.order_by_attr.attribute_name);
+      int idx = field_to_idx[{table, field}];
+      bool isAsc = orderBy.asc;
+      if (isAsc) {
+        return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
+      } else {
+        return cell_check(tuple1[idx], CompOp::GREAT_THAN, tuple2[idx]);
+      }
     });
-    if (!isAsc) {
-      std::reverse(res.begin(), res.end());
-    }
   }
 
   // 输出环节
