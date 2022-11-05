@@ -888,18 +888,14 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     int idx = field_to_idx[{table, field}];
     bool isAsc = orderBy.asc;
     std::sort(res.begin(), res.end(), [&](TupleInfo &tuple1, TupleInfo &tuple2) {
-      if (isAsc) {
-        if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
-          return true;
-        }
-        return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
-      } else {
-        if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
-          return true;
-        }
-        return cell_check(tuple1[idx], CompOp::GREAT_THAN, tuple2[idx]);
+      if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
+        return true;
       }
+      return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
     });
+    if (!isAsc) {
+      std::reverse(res.begin(), res.end());
+    }
   }
 
   // 输出环节
