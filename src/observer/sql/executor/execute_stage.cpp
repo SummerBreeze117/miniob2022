@@ -394,7 +394,7 @@ bool cell_check(TupleCell &left_cell, CompOp comp, TupleCell &right_cell) {
   if (comp == EQUAL_TO && !strcmp(left_cell.data(), "1.5a") && *((int*)right_cell.data()) == 2) {
     return false; // bad case
   }
-  if (strcmp(left_cell.data(), "null") == 0 || strcmp(right_cell.data(), "null") == 0) {
+  if (strncmp(left_cell.data(), "null", 4) == 0 || strncmp(right_cell.data(), "null", 4) == 0) {
     return false;
   }
   const int compare = left_cell.compare(right_cell);
@@ -889,8 +889,14 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     bool isAsc = orderBy.asc;
     std::sort(res.begin(), res.end(), [&](TupleInfo &tuple1, TupleInfo &tuple2) {
       if (isAsc) {
+        if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
+          return true;
+        }
         return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
       } else {
+        if (strncmp(tuple1[idx].data(), "null", 4) == 0) {
+          return true;
+        }
         return cell_check(tuple1[idx], CompOp::GREAT_THAN, tuple2[idx]);
       }
     });
