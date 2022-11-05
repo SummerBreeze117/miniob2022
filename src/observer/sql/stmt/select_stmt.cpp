@@ -192,6 +192,30 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     return rc;
   }
 
+  // check order by
+  std::vector<OrderBy> orderbys;
+  for (size_t i = 0; i < select_sql.order_by_num; i ++) {
+    const RelAttr &relation_attr = select_sql.order_bys[i].order_by_attr;
+    Table *table = nullptr;
+    if (!common::is_blank(relation_attr.relation_name)) {
+      auto iter = table_map.find(relation_attr.relation_name);
+      if (iter == table_map.end()) {
+        LOG_WARN("no such table in from list: %s", relation_attr.relation_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      table = iter->second;
+    }
+    if (table == nullptr) {
+      table = tables[0];
+    }
+    const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field. field=%s", relation_attr.attribute_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    orderbys.push_back(select_sql.order_bys[i]);
+  }
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->table_map_.swap(table_map);
@@ -201,6 +225,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->query_fields_forprint_.swap(query_fields_forprint);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->aggregations_.swap(aggregations);
+  select_stmt->orderbys_.swap(orderbys);
   stmt = select_stmt;
   return RC::SUCCESS;
 }

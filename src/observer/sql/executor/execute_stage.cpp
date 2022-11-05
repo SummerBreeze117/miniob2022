@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 #include "execute_stage.h"
 
@@ -872,6 +873,27 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   res = check_condition(res, select_stmt->filter_stmt(), field_to_idx);
+
+  for (OrderBy &orderBy : select_stmt->orderbys()) {
+    Table *table = nullptr;
+    if (orderBy.order_by_attr.relation_name != nullptr &&
+        !common::is_blank(orderBy.order_by_attr.relation_name)) {
+      table = select_stmt->table_map()[orderBy.order_by_attr.relation_name];
+    } else {
+      table = select_stmt->tables()[0];
+    }
+    const FieldMeta *field = table->table_meta().field(orderBy.order_by_attr.attribute_name);
+    int idx = field_to_idx[{table, field}];
+    bool isAsc = orderBy.asc;
+    std::sort(res.begin(), res.end(), [&](TupleInfo &tuple1, TupleInfo &tuple2) {
+      if (isAsc) {
+        return cell_check(tuple1[idx], CompOp::LESS_THAN, tuple2[idx]);
+      } else {
+        return cell_check(tuple1[idx], CompOp::GREAT_THAN, tuple2[idx]);
+      }
+    });
+  }
+
   // 输出环节
   std::stringstream ss;
   if (select_stmt->aggregations().size()) { //聚合函数

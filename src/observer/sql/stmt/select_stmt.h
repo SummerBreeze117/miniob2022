@@ -45,6 +45,7 @@ public:
   std::unordered_map<std::string, Table *> &table_map() { return table_map_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<Aggregation>& aggregations() const { return aggregations_; }
+  std::vector<OrderBy>& orderbys() { return orderbys_; }
 private:
   std::vector<Field> query_fields_;
   std::vector<Field> query_fields_forprint_;
@@ -52,6 +53,7 @@ private:
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
   std::unordered_map<std::string, Table *> table_map_;
+  std::vector<OrderBy> orderbys_;
   bool is_inner_join_;
 };
 

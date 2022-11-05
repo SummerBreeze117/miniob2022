@@ -74,6 +74,9 @@ QUOTE            [\'\"]
 [Aa][Vv][Gg]                                         RETURN_TOKEN(AGGAVG);
 [Ss][Uu][Mm]                                         RETURN_TOKEN(AGGSUM);
 [Ii][Nn][Tt]                                         RETURN_TOKEN(INT_T);
+[Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
+[Bb][Yy]                                             RETURN_TOKEN(BY);
+[Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]                                     RETURN_TOKEN(DATE_T);

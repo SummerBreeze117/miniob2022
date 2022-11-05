@@ -121,6 +121,9 @@ ParserContext *get_context(yyscan_t scanner)
 	AGGAVG
 	AGGSUM
 	UNIQUE
+	ORDER
+	BY
+	ASC
 
 %union {
   struct _Attr *attr;
@@ -449,7 +452,7 @@ select_in_update:
    }
 
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list inner_join_list where SEMICOLON
+    SELECT select_attr FROM ID rel_list inner_join_list where orderbys SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->selection, $4);
@@ -717,6 +720,107 @@ condition:
 			// $$->right_attr.attribute_name=$7;
     }
     ;
+
+orderbys:
+	| ORDER BY ID orderby {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $3);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| ORDER BY ID ASC orderby {
+        	RelAttr attr;
+		relation_attr_init(&attr, NULL, $3);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+        }
+	| ORDER BY ID DESC orderby {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $3);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 0);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| ORDER BY ID DOT ID ASC orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $3, $5);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| ORDER BY ID DOT ID orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $3, $5);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| ORDER BY ID DOT ID DESC orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $3, $5);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 0);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	;
+orderby:
+	| COMMA ID orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| COMMA ID ASC orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| COMMA ID DESC orderby {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 0);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| COMMA ID DOT ID ASC orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $2, $4);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| COMMA ID DOT ID orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $2, $4);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 1);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	| COMMA ID DOT ID DESC orderby{
+		RelAttr attr;
+		relation_attr_init(&attr, $2, $4);
+
+		OrderBy order_by;
+		order_by_init(&order_by, &attr, 0);
+		selects_append_order_by(&CONTEXT->selection, &order_by);
+	}
+	;
 
 comOp:
   	  EQ { CONTEXT->comp = EQUAL_TO; }

@@ -85,6 +85,11 @@ typedef struct {
   Value value;
 } Aggregation;
 
+typedef struct {
+  RelAttr order_by_attr;
+  int asc;
+} OrderBy;
+
 // struct of select
 typedef struct {
   size_t attr_num;                // Length of attrs in Select clause
@@ -97,6 +102,8 @@ typedef struct {
   Condition conditions[MAX_NUM];  // conditions in Where clause
   size_t aggregation_num;
   Aggregation aggregations[MAX_NUM];
+  size_t order_by_num;
+  OrderBy order_bys[MAX_NUM];
 } Selects;
 
 // struct of insert tuple
@@ -254,6 +261,8 @@ void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_join(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_append_aggregation(Selects *selects, Aggregation *aggregation);
+void order_by_init(OrderBy *orderBys, RelAttr *attr, int asc);
+void selects_append_order_by(Selects *selects, OrderBy *order_by);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, InsertTuple tuples[], size_t tuple_num);

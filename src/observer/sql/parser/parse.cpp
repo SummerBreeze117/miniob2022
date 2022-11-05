@@ -168,6 +168,15 @@ void selects_append_aggregation(Selects *selects, Aggregation *aggregation)
   selects->aggregations[selects->aggregation_num++] = *aggregation;
 }
 
+void order_by_init(OrderBy *orderBys, RelAttr *attr, int asc) {
+  orderBys->order_by_attr = *attr;
+  orderBys->asc = asc;
+}
+
+void selects_append_order_by(Selects *selects, OrderBy *order_by) {
+  selects->order_bys[selects->order_by_num++] = *order_by;
+}
+
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {
